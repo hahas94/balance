@@ -12,7 +12,7 @@ import graph
 
 class Intent:
     """Implements an Operational intent object, which represents a drone operation."""
-    def __init__(self, source: graph.Node, destination: graph.Node, start: int) -> None:
+    def __init__(self, source: graph.Node, destination: graph.Node, start: int, uncertainty: int) -> None:
         """
         Creates an instance of an Intent object.
 
@@ -27,6 +27,7 @@ class Intent:
         self._source = source
         self._destination = destination
         self._start = start
+        self._time_uncertainty = uncertainty
         self._path: List[Tuple[str, int, int]] = []  # the path between `source` and `destination`.
         self._actual_time = 0
         self._ideal_time = 0
@@ -53,6 +54,10 @@ class Intent:
     @start.setter
     def start(self, s) -> None:
         self._start = s
+
+    @property
+    def time_uncertainty(self) -> int:
+        return self._time_uncertainty
 
     @property
     def path(self) -> List[Tuple[str, int, int]]:

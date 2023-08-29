@@ -68,9 +68,10 @@ def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List
         intents = data["intents"]
         for op_intent in intents:
             assert isinstance(op_intent['source'], str) and isinstance(op_intent['destination'], str) \
-                   and isinstance(op_intent['start'], int) and op_intent['start'] >= start, (
-                f"{op_intent}: Either syntax error in names, start time being non integer or before "
-                f"operations start time.")
+                   and isinstance(op_intent['start'], int) and op_intent['start'] >= start \
+                   and isinstance(op_intent['uncertainty'], int) and op_intent['uncertainty'] >= 0, (
+                f"{op_intent}: Either syntax error in names, start time being non integer, it starts before "
+                f"operations start time or time uncertainty is negative/non-integer.")
 
         return start, time_horizon, time_delta, nodes, edges, intents
 
@@ -107,7 +108,7 @@ def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time
     }
     intents_dict = {
         (i["source"], i["destination"], i["start"]):
-            intent.Intent(nodes_dict[i["source"]], nodes_dict[i["destination"]], i["start"])
+            intent.Intent(nodes_dict[i["source"]], nodes_dict[i["destination"]], i["start"], i["uncertainty"])
         for i in intents
     }
 
@@ -163,8 +164,19 @@ def adjust_capacities(goal_node: graph.ExtendedNode, nodes_dict: Dict[str, graph
     """
     for node, layer_cap in goal_node.capacities.items():
         nodes_dict[node].layer_capacities = layer_cap
-    # TODO: increment the destination node capacity by 1 at the arrival layer
-    # nodes_dict[goal_node.original.name].layer_capacities[goal_node.layer] += 1
+
+
+def increment_reservations(time_uncertainty, path, nodes_dict, delta):
+    for index, el in enumerate(path[1:]):
+        name, _, _ = el
+        _, previous_layer, start_time = path[index]
+        new_start_time = start_time - time_uncertainty
+        new_left_layer = new_start_time // delta
+
+        for layer in range(max(0, new_left_layer), previous_layer):
+            nodes_dict[name][layer] -= 1
+
+    return None
 
 
 if __name__ == "__main__":
@@ -179,12 +191,23 @@ if __name__ == "__main__":
     greedy_objective: int = 0
 
     for intent_name, operation_intent in global_intents_dict.items():
+        # extract operation_intent.U
+        uncertainty = operation_intent.time_uncertainty
+        # for each previous drone, get path, update vertiport capacities
+        for prev_intent_name, prev_intent in global_intents_dict.items():
+            if prev_intent_name == intent_name:
+                break
+            intent_path = prev_intent.path
+            increment_reservations(uncertainty, intent_path, global_nodes_dict, global_time_delta)
+
         global_time_difference, global_goal_node = \
             solve_intent(intent_name, operation_intent, global_time_delta, list(global_nodes_dict.values()))
 
         if global_goal_node and global_time_difference:
             adjust_capacities(global_goal_node, global_nodes_dict)
             greedy_objective += global_time_difference
+
+    # for each previous drone, get path, update vertiport capacities if they don't intersect with operation_intent path
 
     print(f"Greedy objective:{greedy_objective}")
 

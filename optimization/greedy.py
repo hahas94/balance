@@ -114,6 +114,7 @@ def dijkstra_extended(operation_intent: intent.Intent, delta: int, nodes: Sequen
     source_node = operation_intent.source
     destination_node = operation_intent.destination
     start_time = operation_intent.start
+    time_uncertainty = operation_intent.time_uncertainty
 
     # determine start layer
     k, r = divmod(start_time, delta)
@@ -146,7 +147,9 @@ def dijkstra_extended(operation_intent: intent.Intent, delta: int, nodes: Sequen
         for index, edge in enumerate(current_node.original.outgoing_edges):
             v: graph.Node = edge.destination
             k, r = divmod(edge.weight, delta)
+            k1, r1 = divmod(edge.weight + time_uncertainty, delta)
             n_deltas = k + (r > 0)
+            n_deltas_uncertainty = k1 + (r1 > 0)
             new_weight = n_deltas * delta
             v_travel_time = current_dist + new_weight
             v_extended_name = v.name + str(current_node.layer + n_deltas)
@@ -158,14 +161,14 @@ def dijkstra_extended(operation_intent: intent.Intent, delta: int, nodes: Sequen
                 distances[v_extended_name] = float('inf')
 
             v_has_capacity = current_node.has_capacity(v.name, current_node.layer + 1,
-                                                       current_node.layer + n_deltas + 1)
+                                                       current_node.layer + n_deltas_uncertainty + 1)
             shorter_path_found = v_travel_time < distances[v_extended_name]
 
             if shorter_path_found and v_has_capacity:
                 distances[v_extended_name] = v_travel_time
                 v_extended = create_extended_node(v.name, current_node.layer + n_deltas, current_node, v,
                                                   v_travel_time, index, current_node.layer + 1,
-                                                  current_node.layer + n_deltas + 1)
+                                                  current_node.layer + n_deltas_uncertainty + 1)
                 unvisited_queue.put((v_travel_time, v_extended))
 
         # add the node itself to the queue to indicate the drone
