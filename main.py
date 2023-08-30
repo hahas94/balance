@@ -167,20 +167,47 @@ def adjust_capacities(goal_node: graph.ExtendedNode, nodes_dict: Dict[str, graph
 
 
 def increment_reservations(time_uncertainty, path, nodes_dict, delta):
+    decrementor = time_uncertainty // -time_uncertainty  # either -1 or 1
     for index, el in enumerate(path[1:]):
         name, _, _ = el
         _, previous_layer, start_time = path[index]
-        new_start_time = start_time - time_uncertainty
-        new_left_layer = new_start_time // delta
+        new_left_layer = (start_time - time_uncertainty) // delta
+        l, r = max(0, new_left_layer), previous_layer+1
+        nodes_dict[name].layer_capacities[l:r] = [cap+decrementor for cap in nodes_dict[name].layer_capacities[l:r]]
 
-        for layer in range(max(0, new_left_layer), previous_layer):
-            nodes_dict[name][layer] -= 1
+    return None
+
+
+def decrement_reservations(time_uncertainties, prev_intent_path, curr_intent_path, nodes_dict, delta):
+    # find common vertiports, based on name as well as time intersection
+    common_nodes = []
+
+    u_prev, u_curr = time_uncertainties
+    # for finding tu right layer
+    pk, pr = divmod(u_prev, delta)
+    ck, cr = divmod(u_curr, delta)
+    prev_right_layer = pk + (pr > 0)
+    curr_right_layer = ck + (cr > 0)
+
+    for ind_pel, pel in enumerate(prev_intent_path[1:]):
+        for ind_cel, cel in enumerate(curr_intent_path[1:]):
+            if pel[0] == cel[0]:
+                prev_intent_layer_right = pel[1] + prev_right_layer
+                curr_intent_layer_right = cel[1] + curr_right_layer
+
+                if not ((prev_intent_layer_right < curr_intent_path[ind_cel][1]) or
+                        (prev_intent_path[ind_cel][1] > curr_intent_layer_right)):
+                    common_nodes.append(pel)
+
+    # for each vertiport in prev_intent_path, if it is not a common vertiport, decrement its cap
+    prev_intent_path = [el for el in prev_intent_path if el not in common_nodes]
+    increment_reservations(-u_curr, prev_intent_path, nodes_dict, delta)
 
     return None
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test1.json"
+    example_path = "./examples/test12.json"
 
     global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
         read_example(path=example_path)
@@ -191,7 +218,6 @@ if __name__ == "__main__":
     greedy_objective: int = 0
 
     for intent_name, operation_intent in global_intents_dict.items():
-        # extract operation_intent.U
         uncertainty = operation_intent.time_uncertainty
         # for each previous drone, get path, update vertiport capacities
         for prev_intent_name, prev_intent in global_intents_dict.items():
@@ -207,7 +233,13 @@ if __name__ == "__main__":
             adjust_capacities(global_goal_node, global_nodes_dict)
             greedy_objective += global_time_difference
 
-    # for each previous drone, get path, update vertiport capacities if they don't intersect with operation_intent path
+        # for each previous drone, get path, update vertiport capacities
+        # for prev_intent_name, prev_intent in global_intents_dict.items():
+        #     if prev_intent_name == intent_name:
+        #         break
+        #     intent_path = prev_intent.path
+        #     decrement_reservations([prev_intent.time_uncertainty, uncertainty], intent_path,
+        #                            operation_intent.path, global_nodes_dict, global_time_delta)
 
     print(f"Greedy objective:{greedy_objective}")
 
