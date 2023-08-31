@@ -12,7 +12,7 @@ import graph
 
 class Intent:
     """Implements an Operational intent object, which represents a drone operation."""
-    def __init__(self, source: graph.Node, destination: graph.Node, start: int) -> None:
+    def __init__(self, source: graph.Node, destination: graph.Node, start: int, uncertainty: int) -> None:
         """
         Creates an instance of an Intent object.
 
@@ -27,7 +27,9 @@ class Intent:
         self._source = source
         self._destination = destination
         self._start = start
-        self._path: List[Tuple[str, int, int]] = []  # the path between `source` and `destination`.
+        self._time_uncertainty = uncertainty
+        # the path between `source` and `destination`. (node_name, layer, travel_time, right_most_reserved_layer)
+        self._path: List[Tuple[str, int, int, int]] = []
         self._actual_time = 0
         self._ideal_time = 0
         self._solution_found = False
@@ -55,7 +57,11 @@ class Intent:
         self._start = s
 
     @property
-    def path(self) -> List[Tuple[str, int, int]]:
+    def time_uncertainty(self) -> int:
+        return self._time_uncertainty
+
+    @property
+    def path(self) -> List[Tuple[str, int, int, int]]:
         return self._path
 
     @property
@@ -85,7 +91,8 @@ class Intent:
     def build_path(self, goal_node: Union[None, graph.ExtendedNode]) -> None:
         """Given a goal node, it backtracks on it to create a path from start to destination."""
         while goal_node is not None:
-            self._path.insert(0, (goal_node.original.name, goal_node.layer, goal_node.travel_time))
+            self._path.insert(0, (goal_node.original.name, goal_node.layer, goal_node.travel_time,
+                                  goal_node.uncertainty_layer))
             goal_node = goal_node.previous
         self._solution_found = True
 

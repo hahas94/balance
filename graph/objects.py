@@ -111,6 +111,7 @@ class ExtendedNode:
         self._original = original
         self._capacities_dict: Dict[str, List[int]] = {}  # a dictionary of all original node's capacities at `layer`.
         self._travel_time = travel_time
+        self._uncertainty_layer = 0  # the layer at which a drone will reach this node at the latest.
         self._insertion_order: int = 0  # node will be added to a `queue.PriorityQueue` in an order.
 
     def __repr__(self):
@@ -145,6 +146,14 @@ class ExtendedNode:
     @property
     def layer(self) -> int:
         return self._layer
+
+    @property
+    def uncertainty_layer(self) -> int:
+        return self._uncertainty_layer
+
+    @uncertainty_layer.setter
+    def uncertainty_layer(self, x: int) -> None:
+        self._uncertainty_layer = x
 
     @property
     def insertion_order(self) -> int:

@@ -10,6 +10,7 @@ To run this file, define the path to an example json file first, then run. Examp
 """
 
 import json
+import math
 from typing import List, Dict, Sequence, Tuple, Union
 
 import graph
@@ -68,9 +69,10 @@ def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List
         intents = data["intents"]
         for op_intent in intents:
             assert isinstance(op_intent['source'], str) and isinstance(op_intent['destination'], str) \
-                   and isinstance(op_intent['start'], int) and op_intent['start'] >= start, (
-                f"{op_intent}: Either syntax error in names, start time being non integer or before "
-                f"operations start time.")
+                   and isinstance(op_intent['start'], int) and op_intent['start'] >= start \
+                   and isinstance(op_intent['uncertainty'], int) and op_intent['uncertainty'] >= 0, (
+                f"{op_intent}: Either syntax error in names, start time being non integer, it starts before "
+                f"operations start time or time uncertainty is negative/non-integer.")
 
         return start, time_horizon, time_delta, nodes, edges, intents
 
@@ -107,7 +109,7 @@ def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time
     }
     intents_dict = {
         (i["source"], i["destination"], i["start"]):
-            intent.Intent(nodes_dict[i["source"]], nodes_dict[i["destination"]], i["start"])
+            intent.Intent(nodes_dict[i["source"]], nodes_dict[i["destination"]], i["start"], i["uncertainty"])
         for i in intents
     }
 
@@ -138,11 +140,11 @@ def solve_intent(name: str, operational_intent: intent.Intent, time_delta: int,
         An extended node representing the destination node (if reached).
 
     """
-    goal_node = optimization.dijkstra_extended(operation_intent, time_delta, nodes)
-    optimization.dijkstra_original(operation_intent, nodes)
+    goal_node = optimization.dijkstra_extended(operational_intent, time_delta, nodes)
+    optimization.dijkstra_original(operational_intent, nodes)
 
     print(f"Intent {name}:")
-    operation_intent.solution()
+    operational_intent.solution()
 
     return operational_intent.time_difference, goal_node
 
@@ -163,12 +165,155 @@ def adjust_capacities(goal_node: graph.ExtendedNode, nodes_dict: Dict[str, graph
     """
     for node, layer_cap in goal_node.capacities.items():
         nodes_dict[node].layer_capacities = layer_cap
-    # TODO: increment the destination node capacity by 1 at the arrival layer
-    # nodes_dict[goal_node.original.name].layer_capacities[goal_node.layer] += 1
+
+
+def increment_reservations(time_uncertainty: int, path: List[Tuple[str, int, int, int]], nodes_dict: dict,
+                           delta: int, indices: Sequence) -> None:
+    """
+    Increments reservations of the vertiports of a scheduled operational intent
+    to mitigate the uncertainty of an operation after it in the queue.
+
+    Args:
+        time_uncertainty: int
+            Time uncertainty of an operation down in the intents queue.
+        path: List[Tuple[str, int, int, int]]
+            The path taken by the current operation.
+        nodes_dict: dict
+            Dictionary of nodes objects and their names.
+        delta: int
+            Time discretization delta
+        indices: Sequence
+            Indices of the vertiports that are affected.
+
+    Returns:
+
+    """
+    decrementor = int(math.copysign(1, time_uncertainty))  # sign of time_uncertainty
+    for index in indices:
+        name = path[index][0]
+        previous_layer, start_time = path[index-1][1:3]
+        new_left_layer = (start_time - decrementor*time_uncertainty) // delta
+        l, r = max(0, new_left_layer), previous_layer+1
+        nodes_dict[name].layer_capacities[l:r] = [cap-decrementor for cap in nodes_dict[name].layer_capacities[l:r]]
+
+    return None
+
+
+def decrement_reservations(time_uncertainties: List[int], prev_intent_path: List[Tuple[str, int, int, int]],
+                           curr_intent_path: List[Tuple[str, int, int, int]], nodes_dict: dict, delta: int) -> None:
+    """
+    Undoing `increment_reservations(...)` for the vertiports not being common of
+    the two intents or that their uncertainty buffers don't intersect.
+
+    Args:
+        time_uncertainties: List[int]
+            Time uncertainties of the already scheduled intent and the intent currently being scheduled.
+        prev_intent_path: List[Tuple[str, int, int, int]
+            The path taken by the scheduled operation.
+        curr_intent_path: List[Tuple[str, int, int, int]
+            The path taken by the intent being scheduled.
+        nodes_dict: dict
+            Dictionary of nodes objects and their names.
+        delta: int
+            Time discretization delta
+
+    Returns:
+
+    """
+    # find common vertiports, based on name as well as time intersection
+    common_nodes = []
+    u_prev, u_curr = time_uncertainties
+
+    # find if the two intents have a common vertiport and their uncertainty buffers intersect at that vertiport
+    for ind_p, prev_node in enumerate(prev_intent_path[1:]):
+        for ind_c, curr_node in enumerate(curr_intent_path[1:]):
+            prev_intent_reaches_before = prev_node[3] < curr_intent_path[ind_c][1]
+            prev_intent_starts_after = prev_intent_path[ind_p][1] > curr_node[3]
+            if prev_node[0] == curr_node[0] and not (prev_intent_reaches_before or prev_intent_starts_after):
+                common_nodes.append(prev_node)
+                break
+
+    # for each vertiport in prev_intent_path, if it is not a common vertiport, decrement its cap
+    indices = [i for i in range(1, len(prev_intent_path)) if prev_intent_path[i] not in common_nodes]
+    increment_reservations(-u_curr, prev_intent_path, nodes_dict, delta, indices)
+
+    return None
+
+
+def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_intent: intent.Intent,
+                                     nodes_dict: dict, intents_dict: dict, time_delta: int) -> None:
+    """
+
+    Args:
+        res_type: str
+            Either 'increment' or 'decrement'
+        curr_intent_name: str
+            Name of operational intent
+        curr_intent: intent.Intent
+            The operational intent
+        nodes_dict: dict
+            Dictionary of nodes objects and their names.
+        intents_dict: dict
+            Dictionary of intent objects and their names.
+        time_delta: int
+            Time discretization delta
+
+    Returns:
+
+    """
+    curr_u = curr_intent.time_uncertainty
+
+    for prev_intent_name, prev_intent in intents_dict.items():
+        if prev_intent_name == curr_intent_name:
+            break
+        p_path = prev_intent.path
+        if res_type == 'increment':
+            increment_reservations(curr_u, p_path, nodes_dict, time_delta, range(1, len(p_path)))
+        elif res_type == 'decrement':
+            decrement_reservations([prev_intent.time_uncertainty, curr_u], p_path, curr_intent.path, nodes_dict,
+                                   time_delta)
+    return None
+
+
+def main(nodes_dict: dict, intents_dict: dict, time_delta: int) -> int:
+    """
+    The main function that solves each operational intent in sequence.
+
+    Args:
+        nodes_dict: dict
+            Dictionary of nodes objects and their names.
+        intents_dict: dict
+            Dictionary of intent objects and their names.
+        time_delta: int
+            Time discretization delta
+
+    Returns:
+        greedy_obj: int
+            The greedy objective
+
+    """
+    greedy_obj: int = 0
+
+    for intent_name, operation_intent in intents_dict.items():
+        # for each previous drone, get path, update vertiport capacities
+        uncertainty_reservation_handling('increment', intent_name, operation_intent, nodes_dict, intents_dict,
+                                         time_delta)
+
+        # solve intent
+        time_difference, goal_node = solve_intent(intent_name, operation_intent, time_delta, list(nodes_dict.values()))
+
+        if goal_node and time_difference:
+            adjust_capacities(goal_node, nodes_dict)
+            greedy_obj += time_difference
+
+        # for each previous drone, get path, update vertiport capacities
+        uncertainty_reservation_handling('decrement', intent_name, operation_intent, nodes_dict, intents_dict,
+                                         time_delta)
+    return greedy_obj
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test1.json"
+    example_path = "./examples/test14.json"
 
     global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
         read_example(path=example_path)
@@ -176,16 +321,8 @@ if __name__ == "__main__":
     global_nodes_dict, global_edges_dict, global_intents_dict = \
         create_dicts(global_nodes, global_edges, global_intents, global_time_horizon, global_time_delta)
 
-    greedy_objective: int = 0
+    greedy_objective = main(global_nodes_dict, global_intents_dict, global_time_delta)
 
-    for intent_name, operation_intent in global_intents_dict.items():
-        global_time_difference, global_goal_node = \
-            solve_intent(intent_name, operation_intent, global_time_delta, list(global_nodes_dict.values()))
-
-        if global_goal_node and global_time_difference:
-            adjust_capacities(global_goal_node, global_nodes_dict)
-            greedy_objective += global_time_difference
-
-    print(f"Greedy objective:{greedy_objective}")
+    print(f"Greedy objective: {greedy_objective}")
 
 # =============================================== END OF FILE ===============================================
