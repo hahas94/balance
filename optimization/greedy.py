@@ -58,7 +58,8 @@ def dijkstra_original(operation_intent: intent.Intent, nodes: Sequence[graph.Nod
 
 
 def create_extended_node(name: str, layer: int, previous: graph.ExtendedNode, original: graph.Node,
-                         travel_time: int, insertion_order: int, start: int, stop: int) -> graph.ExtendedNode:
+                         travel_time: int, insertion_order: int, start: int, stop: int, n_deltas_uncertainty) \
+        -> graph.ExtendedNode:
     """
     Helper function that creates and returns an ExtendedNode and modifies some of its variables.
 
@@ -79,6 +80,8 @@ def create_extended_node(name: str, layer: int, previous: graph.ExtendedNode, or
             Layer from which the drone departs.
         stop: int
             Layer (exclusive) at which the drone reaches this node.
+        n_deltas_uncertainty: int
+            Travel time plus time uncertainty converted to time deltas.
 
     Returns:
         extended: graph.ExtendedNode
@@ -86,6 +89,7 @@ def create_extended_node(name: str, layer: int, previous: graph.ExtendedNode, or
     """
     extended = graph.ExtendedNode(name, layer, previous, original, travel_time)
     extended.insertion_order = insertion_order
+    extended.uncertainty_layer = previous.layer + n_deltas_uncertainty
     extended.capacities = copy.deepcopy(previous.capacities)
     extended.decrement_capacity(name, start, stop)
 
@@ -133,6 +137,7 @@ def dijkstra_extended(operation_intent: intent.Intent, delta: int, nodes: Sequen
 
     while not unvisited_queue.empty():
         current_dist, current_node = unvisited_queue.get()
+        curr_layer = current_node.layer
 
         # goal check
         if current_node.original == destination_node:
@@ -160,28 +165,24 @@ def dijkstra_extended(operation_intent: intent.Intent, delta: int, nodes: Sequen
             except KeyError as _:
                 distances[v_extended_name] = float('inf')
 
-            v_has_capacity = current_node.has_capacity(v.name, current_node.layer + 1,
-                                                       current_node.layer + n_deltas_uncertainty + 1)
+            v_has_capacity = current_node.has_capacity(v.name, curr_layer + 1, curr_layer + n_deltas_uncertainty + 1)
             shorter_path_found = v_travel_time < distances[v_extended_name]
 
             if shorter_path_found and v_has_capacity:
                 distances[v_extended_name] = v_travel_time
-                v_extended = create_extended_node(v.name, current_node.layer + n_deltas, current_node, v,
-                                                  v_travel_time, index, current_node.layer + 1,
-                                                  current_node.layer + n_deltas_uncertainty + 1)
+                v_extended = create_extended_node(v.name, curr_layer + n_deltas, current_node, v, v_travel_time, index,
+                                                  curr_layer + 1, curr_layer + n_deltas_uncertainty + 1,
+                                                  n_deltas_uncertainty)
                 unvisited_queue.put((v_travel_time, v_extended))
 
         # add the node itself to the queue to indicate the drone
         # can stay where it is and wait, if it is the departure node
-        # in order to make this available for any node, simply remove
-        # the checking of the node being the source node
         ground_delay_possible = (current_node.original == source_node) and \
-                                (current_node.has_capacity(current_node.original.name, current_node.layer + 1,
-                                                           current_node.layer + 2))
+                                (current_node.has_capacity(current_node.original.name, curr_layer + 1, curr_layer + 2))
         if ground_delay_possible:
-            current_itself = create_extended_node(current_node.original.name, current_node.layer + 1,
-                                                  current_node, current_node.original, current_node.travel_time + delta,
-                                                  index + 1, current_node.layer + 1, current_node.layer + 2)
+            current_itself = create_extended_node(current_node.original.name, curr_layer + 1, current_node,
+                                                  current_node.original, current_node.travel_time + delta,
+                                                  index + 1, curr_layer + 1, curr_layer + 2, 0)
             distances[current_itself.name] = current_itself.travel_time
             unvisited_queue.put((current_itself.travel_time, current_itself))
 

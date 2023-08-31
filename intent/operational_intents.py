@@ -28,7 +28,8 @@ class Intent:
         self._destination = destination
         self._start = start
         self._time_uncertainty = uncertainty
-        self._path: List[Tuple[str, int, int]] = []  # the path between `source` and `destination`.
+        # the path between `source` and `destination`. (node_name, layer, travel_time, right_most_reserved_layer)
+        self._path: List[Tuple[str, int, int, int]] = []
         self._actual_time = 0
         self._ideal_time = 0
         self._solution_found = False
@@ -60,7 +61,7 @@ class Intent:
         return self._time_uncertainty
 
     @property
-    def path(self) -> List[Tuple[str, int, int]]:
+    def path(self) -> List[Tuple[str, int, int, int]]:
         return self._path
 
     @property
@@ -90,7 +91,8 @@ class Intent:
     def build_path(self, goal_node: Union[None, graph.ExtendedNode]) -> None:
         """Given a goal node, it backtracks on it to create a path from start to destination."""
         while goal_node is not None:
-            self._path.insert(0, (goal_node.original.name, goal_node.layer, goal_node.travel_time))
+            self._path.insert(0, (goal_node.original.name, goal_node.layer, goal_node.travel_time,
+                                  goal_node.uncertainty_layer))
             goal_node = goal_node.previous
         self._solution_found = True
 
