@@ -31,8 +31,8 @@ class Example1(unittest.TestCase):
 
         intent_name, operation_intent = list(self.intents.items())[index]
         nodes_list = list(self.nodes.values())
-        goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-        optimization.dijkstra_original(operation_intent, nodes_list)
+        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+        optimization.find_shortest_path(operation_intent, nodes_list)
 
         # assert goal node is reached
         self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -64,8 +64,8 @@ class Example2(unittest.TestCase):
 
         intent_name, operation_intent = list(self.intents.items())[index]
         nodes_list = list(self.nodes.values())
-        goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-        optimization.dijkstra_original(operation_intent, nodes_list)
+        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+        optimization.find_shortest_path(operation_intent, nodes_list)
 
         # assert goal node is reached
         self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -93,8 +93,8 @@ class Example3(unittest.TestCase):
 
         intent_name, operation_intent = list(self.intents.items())[index]
         nodes_list = list(self.nodes.values())
-        goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-        optimization.dijkstra_original(operation_intent, nodes_list)
+        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+        optimization.find_shortest_path(operation_intent, nodes_list)
 
         # assert goal node is reached
         self.assertIs(goal_node, None)
@@ -115,8 +115,8 @@ class Example4(unittest.TestCase):
 
         intent_name, operation_intent = list(self.intents.items())[index]
         nodes_list = list(self.nodes.values())
-        goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-        optimization.dijkstra_original(operation_intent, nodes_list)
+        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+        optimization.find_shortest_path(operation_intent, nodes_list)
 
         # assert goal node is reached
         self.assertIs(goal_node, None)
@@ -141,8 +141,8 @@ class Example5(unittest.TestCase):
 
         intent_name, operation_intent = list(self.intents.items())[index]
         nodes_list = list(self.nodes.values())
-        goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-        optimization.dijkstra_original(operation_intent, nodes_list)
+        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+        optimization.find_shortest_path(operation_intent, nodes_list)
 
         # assert goal node is reached
         self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -174,8 +174,8 @@ class Example6(unittest.TestCase):
 
         intent_name, operation_intent = list(self.intents.items())[index]
         nodes_list = list(self.nodes.values())
-        goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-        optimization.dijkstra_original(operation_intent, nodes_list)
+        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+        optimization.find_shortest_path(operation_intent, nodes_list)
 
         # assert goal node is reached
         self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -207,8 +207,8 @@ class Example7(unittest.TestCase):
 
         for intent_name, operation_intent in self.intents.items():
             nodes_list = list(self.nodes.values())
-            goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-            optimization.dijkstra_original(operation_intent, nodes_list)
+            goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+            optimization.find_shortest_path(operation_intent, nodes_list)
 
             # assert goal node is reached
             self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -242,8 +242,8 @@ class Example8(unittest.TestCase):
 
         for intent_name, operation_intent in self.intents.items():
             nodes_list = list(self.nodes.values())
-            goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-            optimization.dijkstra_original(operation_intent, nodes_list)
+            goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+            optimization.find_shortest_path(operation_intent, nodes_list)
 
             # assert goal node is reached
             self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -279,8 +279,8 @@ class Example9(unittest.TestCase):
 
         for intent_name, operation_intent in self.intents.items():
             nodes_list = list(self.nodes.values())
-            goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-            optimization.dijkstra_original(operation_intent, nodes_list)
+            goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+            optimization.find_shortest_path(operation_intent, nodes_list)
 
             # assert goal node is reached
             self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -316,8 +316,8 @@ class Example10(unittest.TestCase):
 
         for intent_name, operation_intent in list(self.intents.items())[:-1]:
             nodes_list = list(self.nodes.values())
-            goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-            optimization.dijkstra_original(operation_intent, nodes_list)
+            goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+            optimization.find_shortest_path(operation_intent, nodes_list)
 
             # assert goal node is reached
             self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -336,7 +336,7 @@ class Example10(unittest.TestCase):
             index += 1
 
         intent_name, operation_intent = list(self.intents.items())[-1]
-        goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, list(self.nodes.values()))
+        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, list(self.nodes.values()))
         self.assertIs(goal_node, None)
 
 
@@ -361,8 +361,8 @@ class Example11(unittest.TestCase):
             main.uncertainty_reservation_handling('increment', intent_name, operation_intent, self.nodes,
                                                   self.intents, self.time_delta)
 
-            goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-            optimization.dijkstra_original(operation_intent, nodes_list)
+            goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+            optimization.find_shortest_path(operation_intent, nodes_list)
 
             # assert goal node is reached
             self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -384,7 +384,7 @@ class Example11(unittest.TestCase):
             index += 1
 
         intent_name, operation_intent = list(self.intents.items())[-1]
-        goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, list(self.nodes.values()))
+        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, list(self.nodes.values()))
         self.assertIs(goal_node, None)
 
 
@@ -409,8 +409,8 @@ class Example12(unittest.TestCase):
             main.uncertainty_reservation_handling('increment', intent_name, operation_intent, self.nodes,
                                                   self.intents, self.time_delta)
 
-            goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-            optimization.dijkstra_original(operation_intent, nodes_list)
+            goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+            optimization.find_shortest_path(operation_intent, nodes_list)
 
             # assert goal node is reached
             self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -453,8 +453,8 @@ class Example13(unittest.TestCase):
             main.uncertainty_reservation_handling('increment', intent_name, operation_intent, self.nodes,
                                                   self.intents, self.time_delta)
 
-            goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-            optimization.dijkstra_original(operation_intent, nodes_list)
+            goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+            optimization.find_shortest_path(operation_intent, nodes_list)
 
             # assert goal node is reached
             self.assertEqual(goal_node.original.name, operation_intent.destination.name)
@@ -497,8 +497,8 @@ class Example14(unittest.TestCase):
             main.uncertainty_reservation_handling('increment', intent_name, operation_intent, self.nodes,
                                                   self.intents, self.time_delta)
 
-            goal_node = optimization.dijkstra_extended(operation_intent, self.time_delta, nodes_list)
-            optimization.dijkstra_original(operation_intent, nodes_list)
+            goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
+            optimization.find_shortest_path(operation_intent, nodes_list)
 
             # assert goal node is reached
             self.assertEqual(goal_node.original.name, operation_intent.destination.name)
