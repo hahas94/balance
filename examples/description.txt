@@ -1,0 +1,26 @@
+File description:
+-----------------
+
+This file contains a description of how an example json file is structured,
+which is identical to test files as well.
+
+1. Each example or test file is json formatted.
+2. It contains six variables:
+    "start": start time of operations
+    "time_horizon": end time of operations planning, in minutes.
+    "time_delta": time discretization factor, which divides the planning time into chunks.
+
+    "nodes": a list of nodes, where each node is an object having the variables
+        "name": name of node
+         "capacity": capacity of node
+
+    "edges": a list of edges, where each edge is an object having the variables
+        "source":  name of source node,
+        "destination":  name of destination node
+         "weight": weight of edge in minutes. Assuming all drones have the same speed.
+
+    "intents": a list of intents, where each intent is an object having the variables
+        "source":  name of  source node
+        "destination":  name of destination node
+        "start": time start of operation
+        "uncertainty": time uncertainty in minutes.
