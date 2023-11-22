@@ -13,7 +13,7 @@ import graph
 import intent
 
 
-def dijkstra_original(operation_intent: intent.Intent, nodes: Sequence[graph.Node]) -> None:
+def find_shortest_path(operation_intent: intent.Intent, nodes: Sequence[graph.Node]) -> None:
     """
     Runs the original Dijkstra's algorithm to find the shortest path.
     The graph is built successively.
@@ -96,7 +96,7 @@ def create_extended_node(name: str, layer: int, previous: graph.ExtendedNode, or
     return extended
 
 
-def dijkstra_extended(operation_intent: intent.Intent, delta: int, nodes: Sequence[graph.Node]) \
+def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nodes: Sequence[graph.Node]) \
         -> Union[None, graph.ExtendedNode]:
     """
     Runs the specialized Dijkstra's algorithm to find the shortest
