@@ -6,7 +6,7 @@ use both the greedy approach and integer programming approach to solve the
 routing problem and save the results.
 
 To run this file, define the path to an example json file first, then run. Example:
-    `example_path = "./examples/test1.json"`
+    `example_path = "./examples/example1.json"`
 """
 
 import json
@@ -20,7 +20,9 @@ import optimization
 
 def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List[Dict]]:
     """
-    Opens an example file, reads and returns its content. Program exists if json data is invalid.
+    Opens an example file, reads it and returns its content. Program exits if json data format is invalid.
+    It will throw assertion errors if the actual data is of incorrect type or value.
+
     Parameters
     ----------
     path: str
@@ -51,9 +53,6 @@ def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List
         assert time_delta > 0 and isinstance(time_delta, int) and time_horizon % time_delta == 0, \
             ("Time delta must be a positive integer and a multiple of it equal the time horizon, "
              "i.e. T = k*delta for an integer k.")
-
-        k, r = divmod(time_horizon, time_delta)
-        assert isinstance(k, int) and r == 0, "Time horizon must be an integer multiple of time delta."
 
         nodes = data["nodes"]
         for node in nodes:
@@ -119,7 +118,8 @@ def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time
 def solve_intent(name: str, operational_intent: intent.Intent, time_delta: int,
                  nodes: Sequence[graph.Node]) -> Tuple[Union[int, None], Union[graph.ExtendedNode, None]]:
     """
-    Given data related to an operational intent, it runs the greedy algorithms on that intent.
+    Given data related to an operational intent, it runs the greedy algorithms on that intent,
+    and prints the path found for it, if successfull.
 
     Parameters
     ----------
@@ -140,8 +140,8 @@ def solve_intent(name: str, operational_intent: intent.Intent, time_delta: int,
         An extended node representing the destination node (if reached).
 
     """
-    goal_node = optimization.dijkstra_extended(operational_intent, time_delta, nodes)
-    optimization.dijkstra_original(operational_intent, nodes)
+    goal_node = optimization.find_shortest_path_extended(operational_intent, time_delta, nodes)
+    optimization.find_shortest_path(operational_intent, nodes)
 
     print(f"Intent {name}:")
     operational_intent.solution()
@@ -152,7 +152,7 @@ def solve_intent(name: str, operational_intent: intent.Intent, time_delta: int,
 def adjust_capacities(goal_node: graph.ExtendedNode, nodes_dict: Dict[str, graph.Node]) -> None:
     """
     Given a dictionary of original graph nodes, it adjusts their capacities
-    to reflect to the latest planned intent.
+    to include the capacities of the latest planned intent.
 
     Args:
         goal_node: graph.ExtendedNode
@@ -243,10 +243,17 @@ def decrement_reservations(time_uncertainties: List[int], prev_intent_path: List
 def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_intent: intent.Intent,
                                      nodes_dict: dict, intents_dict: dict, time_delta: int) -> None:
     """
+    When planning an intent, previously scheduled intents must be safe from this current intent being delayed,
+    hence the vertiports along all the paths of the previous intents are eserved for longer time.
+
+    When the current intent is scheduled, then all the vertiports that were reserved for longer time but
+    that are not included in the path of this current intent are being freed from that extra reservation.
+
+    Depending on those two opposing cases, this function calls other functions to do the job.
 
     Args:
         res_type: str
-            Either 'increment' or 'decrement'
+            Either 'increment' or 'decrement', indicating whether a vertiport is reserved or freed at a layer.
         curr_intent_name: str
             Name of operational intent
         curr_intent: intent.Intent
