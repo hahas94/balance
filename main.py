@@ -115,7 +115,7 @@ def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time
     return nodes_dict, edges_dict, intents_dict
 
 
-def solve_intent(name: str, operational_intent: intent.Intent, time_delta: int,
+def solve_greedy(name: str, operational_intent: intent.Intent, time_delta: int,
                  nodes: Sequence[graph.Node]) -> Tuple[Union[int, None], Union[graph.ExtendedNode, None]]:
     """
     Given data related to an operational intent, it runs the greedy algorithms on that intent,
@@ -147,6 +147,33 @@ def solve_intent(name: str, operational_intent: intent.Intent, time_delta: int,
     operational_intent.solution()
 
     return operational_intent.time_difference, goal_node
+
+
+def solve_ip(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int):
+    """
+    This function calls the ip optimization model to find a schedule for all the intents.
+
+    Parameters
+    ----------
+    nodes: dict
+        Dictionary of the nodes in a graph and their names.
+    edges: dict
+        Dictionary of the edges in a graph and their names.
+    intents: dict
+        Dictionary of the operational intents to be scheduled and their names.
+    time_steps: range
+        A range object for the discretized time steps.
+    time_delta: int
+        Time discretization step.
+
+    Returns
+    -------
+    ip_obj: float
+        The objective of the model
+
+    """
+    ip_obj = optimization.ip_optimization(nodes, edges, intents, time_steps, time_delta)
+    return ip_obj
 
 
 def adjust_capacities(goal_node: graph.ExtendedNode, nodes_dict: Dict[str, graph.Node]) -> None:
@@ -282,21 +309,28 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
     return None
 
 
-def main(nodes_dict: dict, intents_dict: dict, time_delta: int) -> int:
+def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int, time_steps: range) \
+        -> Tuple[int, float]:
     """
     The main function that solves each operational intent in sequence.
 
     Args:
         nodes_dict: dict
             Dictionary of nodes objects and their names.
+        edges_dict: dict
+            Dictionary of edges objects and their names.
         intents_dict: dict
             Dictionary of intent objects and their names.
         time_delta: int
             Time discretization delta
+        time_steps: range
+            A range object for the discretized time steps.
 
     Returns:
         greedy_obj: int
             The greedy objective
+        ip_obj: int
+            The ip optimization objective
 
     """
     greedy_obj: int = 0
@@ -307,7 +341,7 @@ def main(nodes_dict: dict, intents_dict: dict, time_delta: int) -> int:
                                          time_delta)
 
         # solve intent
-        time_difference, goal_node = solve_intent(intent_name, operation_intent, time_delta, list(nodes_dict.values()))
+        time_difference, goal_node = solve_greedy(intent_name, operation_intent, time_delta, list(nodes_dict.values()))
 
         if goal_node and time_difference:
             adjust_capacities(goal_node, nodes_dict)
@@ -316,11 +350,14 @@ def main(nodes_dict: dict, intents_dict: dict, time_delta: int) -> int:
         # for each previous drone, get path, update vertiport capacities
         uncertainty_reservation_handling('decrement', intent_name, operation_intent, nodes_dict, intents_dict,
                                          time_delta)
-    return greedy_obj
+
+    ip_obj = solve_ip(nodes_dict, edges_dict, intents_dict, time_steps, time_delta)
+
+    return greedy_obj, ip_obj
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test14.json"
+    example_path = "./examples/test1.json"
 
     global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
         read_example(path=example_path)
@@ -328,8 +365,11 @@ if __name__ == "__main__":
     global_nodes_dict, global_edges_dict, global_intents_dict = \
         create_dicts(global_nodes, global_edges, global_intents, global_time_horizon, global_time_delta)
 
-    greedy_objective = main(global_nodes_dict, global_intents_dict, global_time_delta)
+    global_time_steps = range(global_start, global_time_horizon+1, global_time_delta)
 
-    print(f"Greedy objective: {greedy_objective}")
+    greedy_objective, ip_objective = main(global_nodes_dict, global_edges_dict, global_intents_dict,
+                                          global_time_delta, global_time_steps)
+
+    print(f"Greedy objective: {greedy_objective}\nInteger programming objective: {ip_objective}")
 
 # =============================================== END OF FILE ===============================================
