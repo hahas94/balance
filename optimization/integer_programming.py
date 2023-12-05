@@ -23,7 +23,7 @@ There are five constraints to be satisfied:
 
 The objective of the model is to find the shortest total time of operation for all intents.
 """
-import itertools
+
 import mip
 
 
@@ -74,8 +74,6 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     """
     ip_obj = 0
 
-    model = mip.Model(name="balance", sense=mip.MINIMIZE, solver_name=mip.GUROBI)
-
     # ---- Constants ----
     vertiports_list = list(nodes.keys())
     vertiports_ids = range(len(vertiports_list))
@@ -83,39 +81,49 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     edges_ids = range(len(edges_list))
     drones_list = list(intents.keys())
     drones_ids = range(len(drones_list))
-    time_steps_ids = [i for i in range(len(time_steps))]
+    time_steps_ids = range(len(time_steps))
+    destination_vertiports_names = [intent.destination.name for intent in intents.values()]
     earliest_departure_times = [intent.start for intent in intents.values()]
     edge_weights = [calculate_edge_weight(edge.weight, time_delta) for edge in edges.values()]
 
+    # ---- Model definition ----
+    model = mip.Model(name="balance", sense=mip.MINIMIZE, solver_name=mip.GUROBI)
+
     # ---- Decision variables ----
     # whether edge e is traversed by drone d starting at time step t
-    drones_path = [[[model.add_var(name=f"{e}{d}{t}", var_type=mip.BINARY)
-                     for t in time_steps]
-                    for d in drones_list]
-                   for e in edges_list]
+    drones_path = [[[model.add_var(name=f"e{e}d{d}t{t*time_delta}", var_type=mip.BINARY)
+                     for t in time_steps_ids]
+                    for d in drones_ids]
+                   for e in edges_ids]
 
     # whether vertiport v is reserved for drone d starting at time step t
-    vertiport_reserved = [[[model.add_var(name=f"{v}{d}{t}", var_type=mip.BINARY)
-                            for t in time_steps]
+    vertiport_reserved = [[[model.add_var(name=f"v{v}d{d}t{t*time_delta}", var_type=mip.BINARY)
+                            for t in time_steps_ids]
                            for d in drones_ids]
                           for v in vertiports_ids]
 
+    # ---- Constraints ----
+    # Arrival constraint: a drone must end up in its detination vertiport
+    for d in drones_ids:
+        dest = destination_vertiports_names[d]
+        valid_edges = [idx for idx in edges_ids if edges_list[idx][1] == dest]
+        model.add_constr(mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges) == 1,
+                         "Arrival constraint")
+
     # ---- Objective ----
-    # minimizing the total sum of times of all drones schedules.
+    # minimizing the total sum of times of all drone schedules.
     model.objective = mip.xsum(drones_path[e][d][t] * edge_weights[e]
                                for e in edges_ids for d in drones_ids for t in time_steps_ids
                                )
     model.optimize()
-
-    # ---- Constraints ----
 
     # ---- Output ----
     # checking if a solution was found
     if model.num_solutions:
         ip_obj = model.objective_value
         print(f"ip_obj={ip_obj}")
-        # for idx, el in enumerate(edges_drones_timesteps_product):
-        #     print(f"{el}: {drones_path[idx].x}")
+        for el in model.vars:
+            print(f"{el}: {el.x}")
 
     return ip_obj
 
