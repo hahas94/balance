@@ -82,6 +82,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     drones_list = list(intents.keys())
     drones_ids = range(len(drones_list))
     time_steps_ids = range(len(time_steps))
+    source_vertiports_names = [intent.source.name for intent in intents.values()]
     destination_vertiports_names = [intent.destination.name for intent in intents.values()]
     earliest_departure_times = [intent.start for intent in intents.values()]
     edge_weights = [calculate_edge_weight(edge.weight, time_delta) for edge in edges.values()]
@@ -103,7 +104,17 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                           for v in vertiports_ids]
 
     # ---- Constraints ----
-    # Arrival constraint: a drone must end up in its detination vertiport
+    # 4. An operation cannot start earlier than its time of departure, that is all edges with source
+    #    being start vertiport and at all times before departure, these edges must have value 0.
+    for d in drones_ids:
+        src = source_vertiports_names[d]
+        departure_time = earliest_departure_times[d]
+        earlier_times = range(departure_time)
+        valid_edges = [idx for idx in edges_ids if edges_list[idx][0] == src]
+        model.add_constr(mip.xsum(drones_path[e][d][t] for t in earlier_times for e in valid_edges) == 0,
+                         "No early departure constraint")
+
+    # 5. Arrival constraint: a drone must end up in its detination vertiport
     for d in drones_ids:
         dest = destination_vertiports_names[d]
         valid_edges = [idx for idx in edges_ids if edges_list[idx][1] == dest]
