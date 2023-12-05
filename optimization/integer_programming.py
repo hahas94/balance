@@ -104,6 +104,13 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                           for v in vertiports_ids]
 
     # ---- Constraints ----
+    # 3. A vertiport cannot be overcapacitated at any point in time, meaning sum
+    #    of all reservations of a vertiport cannot exceed the maximum capacity.
+    for v in vertiports_ids:
+        v_max_capacity = nodes[vertiports_list[v]].capacity
+        model.add_constr(mip.xsum(vertiport_reserved[v][d][t] for t in time_steps_ids for d in drones_ids) <=
+                         v_max_capacity, "Capacity constraint")
+
     # 4. An operation cannot start earlier than its time of departure, that is all edges with source
     #    being start vertiport and at all times before departure, these edges must have value 0.
     for d in drones_ids:
