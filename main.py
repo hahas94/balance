@@ -357,7 +357,7 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test1.json"
+    example_path = "./examples/spec.json"
 
     global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
         read_example(path=example_path)
