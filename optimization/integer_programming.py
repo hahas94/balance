@@ -8,7 +8,7 @@ Given a list of operational intents, this model creates a list for their earlies
 as well as a list of all edges, and a list of time steps.
 
 The model has a binary decision variable for each edge, drone and time step, where the variable has value 1
-if drone `d` traverses that edge at time `t`.
+if drone `d` starts traversing that edge at time `t`.
 Likewise, a binary decision variable exists for each vertiport, intent and time step, where it has value 1 if
 vertiport `i` is reserved for drone d at time `t`.
 
@@ -96,7 +96,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     model = mip.Model(name="balance", sense=mip.MINIMIZE, solver_name=mip.GUROBI)
 
     # ---- Decision variables ----
-    # whether edge e is traversed by drone d starting at time step t
+    # whether drone d traverses edge e starting at time step t
     drones_path = [[[model.add_var(name=f"Edge_{edges_list[e]}__Drone_{d}__Time_{t * time_delta}", var_type=mip.BINARY)
                      for t in time_steps_ids]
                     for d in drones_ids]
@@ -141,28 +141,51 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     #                                             for e in edges_ids if edges_list[e][0] == vertiports_list[k])
     #                                  <= 0, f"Flow conservation constraint, drone {d} other vertiports.")
 
-    for d in drones_ids:
-        src, dest = source_vertiports_names[d], destination_vertiports_names[d]
-        for k in vertiports_ids:
-            k_name = vertiports_list[k]
-            valid_edges_in = [idx for idx in edges_ids if edges_list[idx][1] == k_name]
-            valid_edges_out = [idx for idx in edges_ids if edges_list[idx][0] == k_name]
+    # for d in drones_ids:
+    #     src, dest = source_vertiports_names[d], destination_vertiports_names[d]
+    #     for k in vertiports_ids:
+    #         k_name = vertiports_list[k]
+    #         valid_edges_in = [idx for idx in edges_ids if edges_list[idx][1] == k_name]
+    #         valid_edges_out = [idx for idx in edges_ids if edges_list[idx][0] == k_name]
+    #
+    #         if k_name == dest:
+    #             model.add_constr(mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges_in)
+    #                              - mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges_out)
+    #                              <= 1,
+    #                              f"Flow conservation constraint, drone {d}")
+    #
+    #         else:
+    #             rhs = -1 if k_name == src else 0
+    #             model.add_constr(mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges_in)
+    #                              - mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges_out)
+    #                              == rhs,
+    #                              f"Flow conservation constraint, drone {d}")
 
-            if k_name == dest:
-                model.add_constr(mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges_in)
-                                 - mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges_out)
-                                 <= 1,
-                                 f"Flow conservation constraint, drone {d}")
-
-            else:
-                rhs = -1 if k_name == src else 0
-                model.add_constr(mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges_in)
-                                 - mip.xsum(drones_path[e][d][t] for t in time_steps_ids for e in valid_edges_out)
-                                 == rhs,
-                                 f"Flow conservation constraint, drone {d}")
+    model.add_constr(drones_path[0][0][0] == 1, "first edge")
+    model.add_constr(drones_path[1][0][1] == 1, "second edge")
 
     # 2. A vertiport must be reserved for the entire duration of a drone flying towards it, inclusive
     #    the time uncertainties, that is being reserved from start time plus duration and uncertainty.
+    # for v in vertiports_ids:
+    #     M = len(edges_list)
+    #     valid_edges = [idx for idx in edges_ids if edges_list[idx][1] == vertiports_list[v]]
+    #     for d in drones_ids:
+    #         U = intents[drones_list[d]].time_uncertainty
+    #         # edge weights with drone uncertainty added to them, except for edges indicating ground delay.
+    #         valid_edges_weight_uncertainty = [
+    #             calculate_edge_weight(edge_weights[idx] + U*int(idx < len(edges)), time_delta) // time_delta
+    #             for idx in valid_edges]
+    #         for t in time_steps_ids:
+    #             time_ranges = [
+    #                 range(max(0, (t - U) // time_delta), min(t + w, time_steps_ids[-1]))
+    #                 for w in valid_edges_weight_uncertainty
+    #             ]
+    #             model.add_constr(
+    #                 (1 / M) * mip.xsum(drones_path[e][d][tau] for indx, e in enumerate(valid_edges)
+    #                                    for tau in time_ranges[indx])
+    #                 <= vertiport_reserved[v][d][t],
+    #                 f"Reservation constraint Vertiport_{v}__Drone_{d}__Time_{t*time_delta}")
+
     for v in vertiports_ids:
         M = len(edges_list)
         valid_edges = [idx for idx in edges_ids if edges_list[idx][1] == vertiports_list[v]]
@@ -174,13 +197,14 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                 for idx in valid_edges]
             for t in time_steps_ids:
                 time_ranges = [
-                    range(max(0, (t - U) // time_delta), min(t + w, time_steps_ids[-1]))
+                    range(max(0, t - w), min((t + U)//time_delta, time_steps_ids[-1]))
                     for w in valid_edges_weight_uncertainty
                 ]
                 model.add_constr(
                     (1 / M) * mip.xsum(drones_path[e][d][tau] for indx, e in enumerate(valid_edges)
                                        for tau in time_ranges[indx])
-                    <= vertiport_reserved[v][d][t], "Reservation constraint")
+                    <= vertiport_reserved[v][d][t],
+                    f"Reservation constraint Vertiport_{v}__Drone_{d}__Time_{t*time_delta}")
 
     # 3. A vertiport cannot be overcapacitated at any point in time, meaning sum
     #    of all reservations of a vertiport cannot exceed the maximum capacity.
@@ -212,30 +236,12 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
         for t in time_steps_ids:
             model.add_constr(mip.xsum(drones_path[e][d][t] for e in edges_ids) <= 1, "One edge at a time is traversed.")
 
-    # Alternative to constraint 2: A vertiport must be reserved for all the time points a drone
-    # is flying towards it.
-    # for v in vertiports_ids:
-    #     valid_edges = [idx for idx in edges_ids if edges_list[idx][1] == vertiports_list[v]]
-    #     for indx, e in enumerate(valid_edges):
-    #         for d in drones_ids:
-    #             U = intents[drones_list[d]].time_uncertainty
-    #             valid_edges_weight_uncertainty = [edge_weights[idx] + U * int(idx < len(edges)) for idx in
-    #                                               valid_edges]
-    #             for t in time_steps_ids:
-    #                 w = valid_edges_weight_uncertainty[indx]
-    #                 time_range = range(max(0, t - U // time_delta),
-    #                                    min(math.ceil((t + calculate_edge_weight(w, time_delta)) / time_delta),
-    #                                        time_steps_ids[-1]))
-    #                 model.add_constr(drones_path[e][d][t] * mip.xsum(vertiport_reserved[v][d][time]
-    #                                                                  for time in time_range)
-    #                                  == drones_path[e][d][t] * len(time_range))
-
     # ---- Objective ----
     # minimizing the total sum of times of all drone schedules.
     model.objective = mip.xsum(drones_path[e][d][t] * edge_weights_td[e]
                                for e in edges_ids for d in drones_ids for t in time_steps_ids
                                )
-    model.optimize()
+    status = model.optimize()
 
     # ---- Output ----
     # checking if a solution was found
