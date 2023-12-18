@@ -28,27 +28,27 @@ import math
 import mip
 
 
-def calculate_edge_weight(weight: int, time_delta: int) -> int:
-    """
-    This function calculates the corresponding time discretized weight of an edge given its original weight.
-
-    Parameters
-    ----------
-    weight: int
-        Original weight of an edge in minutes.
-    time_delta: int
-        Time discretization step.
-
-    Returns
-    -------
-    weight: int
-        New weight
-
-    """
-    k, r = divmod(weight, time_delta)
-    weight = (k + int(r > 0)) * time_delta
-
-    return weight
+# def calculate_edge_weight(weight: int, time_delta: int) -> int:
+#     """
+#     This function calculates the corresponding time discretized weight of an edge given its original weight.
+#
+#     Parameters
+#     ----------
+#     weight: int
+#         Original weight of an edge in minutes.
+#     time_delta: int
+#         Time discretization step.
+#
+#     Returns
+#     -------
+#     weight: int
+#         New weight
+#
+#     """
+#     k, r = divmod(weight, time_delta)
+#     weight = (k + int(r > 0)) * time_delta
+#
+#     return weight
 
 
 def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int) -> float:
@@ -89,7 +89,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     destination_vertiports_names = [intent.destination.name for intent in intents.values()]
     earliest_departure_times = [intent.start for intent in intents.values()]
     edge_weights = [edge.weight for edge in edges.values()] + [time_delta for _ in drones_ids]
-    edge_weights_td = [calculate_edge_weight(edge.weight, time_delta) for edge in edges.values()] + \
+    edge_weights_td = [math.ceil(edge.weight/time_delta)*time_delta for edge in edges.values()] + \
                       [time_delta for _ in drones_ids]  # edge weights in terms of time delta
 
     # ---- Model definition ----
@@ -192,14 +192,14 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
         for d in drones_ids:
             U = intents[drones_list[d]].time_uncertainty
             # edge weights with drone uncertainty added to them, except for edges indicating ground delay.
-            valid_edges_weight_uncertainty = [
-                calculate_edge_weight(edge_weights[idx] + U*int(idx < len(edges)), time_delta) // time_delta
-                for idx in valid_edges]
+            weight_uncertainty = [
+                math.ceil((edge_weights[idx]+U*int(idx < len(edges))) / time_delta) for idx in valid_edges
+            ]
             for t in time_steps_ids:
-                time_ranges = [
-                    range(max(0, t - w), min((t + U)//time_delta, time_steps_ids[-1]))
-                    for w in valid_edges_weight_uncertainty
-                ]
+                T = time_steps_ids[-1]
+                ub = math.ceil((t*time_delta + U) / time_delta)
+                time_ranges = [range(max(0, t - weight_uncertainty[idx] + 1), min(ub if idx < len(edges) else t, T) + 1)
+                               for idx, _ in enumerate(valid_edges)]
                 model.add_constr(
                     (1 / M) * mip.xsum(drones_path[e][d][tau] for indx, e in enumerate(valid_edges)
                                        for tau in time_ranges[indx])
@@ -238,9 +238,10 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
 
     # ---- Objective ----
     # minimizing the total sum of times of all drone schedules.
-    model.objective = mip.xsum(drones_path[e][d][t] * edge_weights_td[e]
-                               for e in edges_ids for d in drones_ids for t in time_steps_ids
-                               )
+    model.objective = (mip.xsum(drones_path[e][d][t] * edge_weights_td[e]
+                                for e in edges_ids for d in drones_ids for t in time_steps_ids)
+                       + mip.xsum(vertiport_reserved[v][d][t]
+                                  for t in time_steps_ids for d in drones_ids for v in vertiports_ids)/9999999)
     status = model.optimize()
 
     # ---- Output ----
