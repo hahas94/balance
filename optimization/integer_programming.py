@@ -177,6 +177,13 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                     model.add_constr(drones_arrival[e][d][t] == drones_departure[e][d][w],
                                      "Drone arrival and departure times differs by edge weight.")
 
+    # Extra: A drone's total travel time cannot pass beyond time horizon.
+    T = time_steps[-1]
+    for d in drones_ids:
+        model.add_constr(mip.xsum(drones_departure[e][d][t]*edge_weights_td[e]
+                                  for t in time_steps_ids for e in edges_ids)
+                         <= T, "")
+
     # Extra: A drone can traverse one edge at a time.
     for d in drones_ids:
         for t in time_steps_ids:
@@ -195,9 +202,9 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     # checking if a solution was found
     if model.num_solutions:
         ip_obj = model.objective_value
-        # print(f"ip_obj={ip_obj}")
-        # for el in model.vars:
-        #     print(f"{el}: {el.x}")
+        print(f"ip_obj={ip_obj}")
+        for el in model.vars:
+            print(f"{el}: {el.x}")
 
         for d in drones_ids:
             path = []

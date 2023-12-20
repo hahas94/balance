@@ -147,22 +147,26 @@ class Intent:
 
         The greedy and ip solutions are printed one fter another.
         """
-        if self._greedy_solution_found and self._ip_solution_found:
+        if self._greedy_solution_found:
             solution_greedy = "".join([f"[node:{el[0]}, layer:{el[1]}, time:{self._start+el[2]}]" +
                                        (" --> " if index < len(self._path_greedy) - 1 else "")
                                        for index, el in enumerate(self._path_greedy)])
-            solution_ip = "".join([f"[node:{el[0]}, layer:{el[1]}, time:{self._start+el[2]}]" +
+            print(f"\t{solution_greedy}")
+        else:
+            print(f"\tNo solution is possible for this operational intent.")
+
+        if self._ip_solution_found:
+            solution_ip = "".join([f"[node:{el[0]}, layer:{el[1]}, time:{self._start + el[2]}]" +
                                    (" --> " if index < len(self._path_ip) - 1 else "")
                                    for index, el in enumerate(self._path_ip)])
-            print(f"\t{solution_greedy}")
             print(f"\t{solution_ip}")
+        else:
+            print(f"\tNo solution is possible for this operational intent.\n\n")
+
             print(f"\tideal time:{self.ideal_time}, "
                   f"actual greedy time:{self.actual_greedy_time}, "
                   f"actual ip time: {self._actual_ip_time}, "
                   f"greedy time difference:{self.greedy_time_difference}, "
                   f"ip time difference:{self.ip_time_difference}\n\n")
-        else:
-            print(f"\tNo solution is possible for this operational intent.\n\n")
-
 
 # =============================================== END OF FILE ===============================================
