@@ -29,10 +29,13 @@ class Intent:
         self._start = start
         self._time_uncertainty = uncertainty
         # the path between `source` and `destination`. (node_name, layer, travel_time, right_most_reserved_layer)
-        self._path: List[Tuple[str, int, int, int]] = []
-        self._actual_time = 0
+        self._path_greedy: List[Tuple[str, int, int, int]] = []
+        self._path_ip: List[Tuple[str, int, int, int]] = []
+        self._actual_greedy_time = 0
+        self._actual_ip_time = 0
         self._ideal_time = 0
-        self._solution_found = False
+        self._greedy_solution_found = False
+        self._ip_solution_found = False
 
     def __repr__(self):
         return f"Intent(source={self._source.name}, destination={self._destination.name}, start={self._start})"
@@ -61,20 +64,39 @@ class Intent:
         return self._time_uncertainty
 
     @property
-    def path(self) -> List[Tuple[str, int, int, int]]:
-        return self._path
+    def path_greedy(self) -> List[Tuple[str, int, int, int]]:
+        return self._path_greedy
 
     @property
-    def time_difference(self) -> Union[int, None]:
-        return self._actual_time - self._ideal_time if (self._ideal_time > 0 and self._actual_time > 0) else None
+    def path_ip(self) -> List[Tuple[str, int, int, int]]:
+        return self._path_ip
 
     @property
-    def actual_time(self) -> int:
-        return self._actual_time
+    def greedy_time_difference(self) -> Union[int, None]:
+        td = self._actual_greedy_time - self._ideal_time \
+            if (self._ideal_time > 0 and self._actual_greedy_time > 0) else None
+        return td
 
-    @actual_time.setter
-    def actual_time(self, time: int) -> None:
-        self._actual_time = time
+    @property
+    def ip_time_difference(self) -> Union[int, None]:
+        td = self._actual_ip_time - self._ideal_time if (self._ideal_time > 0 and self._actual_ip_time > 0) else None
+        return td
+
+    @property
+    def actual_greedy_time(self) -> int:
+        return self._actual_greedy_time
+
+    @actual_greedy_time.setter
+    def actual_greedy_time(self, time: int) -> None:
+        self._actual_greedy_time = time
+
+    @property
+    def actual_ip_time(self) -> int:
+        return self._actual_ip_time
+
+    @actual_ip_time.setter
+    def actual_ip_time(self, time: int) -> None:
+        self._actual_ip_time = time
 
     @property
     def ideal_time(self) -> int:
@@ -85,29 +107,60 @@ class Intent:
         self._ideal_time = time
 
     @property
-    def solution_found(self) -> bool:
-        return self._solution_found
+    def greedy_solution_found(self) -> bool:
+        return self._greedy_solution_found
 
-    def build_path(self, goal_node: Union[None, graph.ExtendedNode]) -> None:
+    @property
+    def ip_solution_found(self) -> bool:
+        return self._ip_solution_found
+
+    def build_greedy_path(self, goal_node: Union[None, graph.ExtendedNode]) -> None:
         """Given a goal node, it backtracks on it to create a path from start to destination."""
         while goal_node is not None:
-            self._path.insert(0, (goal_node.original.name, goal_node.layer, goal_node.travel_time,
-                                  goal_node.uncertainty_layer))
+            self._path_greedy.insert(0, (goal_node.original.name, goal_node.layer, goal_node.travel_time,
+                                         goal_node.uncertainty_layer))
             goal_node = goal_node.previous
-        self._solution_found = True
+        self._greedy_solution_found = True
+
+    def build_ip_path(self, path: list) -> None:
+        """
+        Assigns the ip-found path for the intent to the relevant instance variable.
+
+        Parameters
+        ----------
+        path: list
+            A list of tuples for each link in the path.
+
+        Returns
+        -------
+            None
+
+        """
+        self._path_ip = path
+        self._ip_solution_found = True
 
     def solution(self) -> None:
         """
-        Prints a string representation of the operation path and times.
+        Prints a string representation of the operation paths and times.
         A path may not exist for a number of reasons, such as planning tie
         beyond time horizon, vertiports being all reserved, or no real path exist.
+
+        The greedy and ip solutions are printed one fter another.
         """
-        if self._solution_found:
-            solution = "".join([f"[node:{el[0]}, layer:{el[1]}, time:{self._start+el[2]}]" +
-                                (" --> " if index < len(self._path)-1 else "") for index, el in enumerate(self._path)])
-            print(f"\t{solution}")
-            print(f"\tideal time:{self.ideal_time}, actual time:{self.actual_time}, "
-                  f"time difference:{self.time_difference}\n\n")
+        if self._greedy_solution_found and self._ip_solution_found:
+            solution_greedy = "".join([f"[node:{el[0]}, layer:{el[1]}, time:{self._start+el[2]}]" +
+                                       (" --> " if index < len(self._path_greedy) - 1 else "")
+                                       for index, el in enumerate(self._path_greedy)])
+            solution_ip = "".join([f"[node:{el[0]}, layer:{el[1]}, time:{self._start+el[2]}]" +
+                                   (" --> " if index < len(self._path_ip) - 1 else "")
+                                   for index, el in enumerate(self._path_ip)])
+            print(f"\t{solution_greedy}")
+            print(f"\t{solution_ip}")
+            print(f"\tideal time:{self.ideal_time}, "
+                  f"actual greedy time:{self.actual_greedy_time}, "
+                  f"actual ip time: {self._actual_ip_time}, "
+                  f"greedy time difference:{self.greedy_time_difference}, "
+                  f"ip time difference:{self.ip_time_difference}\n\n")
         else:
             print(f"\tNo solution is possible for this operational intent.\n\n")
 

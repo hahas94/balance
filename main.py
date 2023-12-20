@@ -115,7 +115,7 @@ def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time
     return nodes_dict, edges_dict, intents_dict
 
 
-def solve_greedy(name: str, operational_intent: intent.Intent, time_delta: int,
+def solve_greedy(operational_intent: intent.Intent, time_delta: int,
                  nodes: Sequence[graph.Node]) -> Tuple[Union[int, None], Union[graph.ExtendedNode, None]]:
     """
     Given data related to an operational intent, it runs the greedy algorithms on that intent,
@@ -123,8 +123,6 @@ def solve_greedy(name: str, operational_intent: intent.Intent, time_delta: int,
 
     Parameters
     ----------
-    name: str
-        Operational intent name
     operational_intent: intent.Intent
         An intent object.
     time_delta: int
@@ -143,10 +141,7 @@ def solve_greedy(name: str, operational_intent: intent.Intent, time_delta: int,
     goal_node = optimization.find_shortest_path_extended(operational_intent, time_delta, nodes)
     optimization.find_shortest_path(operational_intent, nodes)
 
-    print(f"Intent {name}:")
-    operational_intent.solution()
-
-    return operational_intent.time_difference, goal_node
+    return operational_intent.greedy_time_difference, goal_node
 
 
 def solve_ip(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int):
@@ -174,6 +169,24 @@ def solve_ip(nodes: dict, edges: dict, intents: dict, time_steps: range, time_de
     """
     ip_obj = optimization.ip_optimization(nodes, edges, intents, time_steps, time_delta)
     return ip_obj
+
+
+def print_solutions(intents: dict) -> None:
+    """
+    Printing the solutions for each intent, in both greedy and ip parts.
+    Also prints the operational time information.
+    Parameters
+    ----------
+    intents: dict
+        Dictionary of operational intents.
+
+    Returns
+    -------
+        None
+    """
+    for name, operational_intent in intents.items():
+        print(f"Intent {name}:")
+        operational_intent.solution()
 
 
 def adjust_capacities(goal_node: graph.ExtendedNode, nodes_dict: Dict[str, graph.Node]) -> None:
@@ -300,11 +313,11 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
     for prev_intent_name, prev_intent in intents_dict.items():
         if prev_intent_name == curr_intent_name:
             break
-        p_path = prev_intent.path
+        p_path = prev_intent.path_greedy
         if res_type == 'increment':
             increment_reservations(curr_u, p_path, nodes_dict, time_delta, range(1, len(p_path)))
         elif res_type == 'decrement':
-            decrement_reservations([prev_intent.time_uncertainty, curr_u], p_path, curr_intent.path, nodes_dict,
+            decrement_reservations([prev_intent.time_uncertainty, curr_u], p_path, curr_intent.path_greedy, nodes_dict,
                                    time_delta)
     return None
 
@@ -312,7 +325,8 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
 def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int, time_steps: range) \
         -> Tuple[int, float]:
     """
-    The main function that solves each operational intent in sequence.
+    The main function that solves each operational intent in sequence,
+    as well as solving them all at once.
 
     Args:
         nodes_dict: dict
@@ -335,13 +349,14 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
     """
     greedy_obj: int = 0
 
+    ip_obj = solve_ip(nodes_dict, edges_dict, intents_dict, time_steps, time_delta)
     for intent_name, operation_intent in intents_dict.items():
         # for each previous drone, get path, update vertiport capacities
         uncertainty_reservation_handling('increment', intent_name, operation_intent, nodes_dict, intents_dict,
                                          time_delta)
 
         # solve intent
-        time_difference, goal_node = solve_greedy(intent_name, operation_intent, time_delta, list(nodes_dict.values()))
+        time_difference, goal_node = solve_greedy(operation_intent, time_delta, list(nodes_dict.values()))
 
         if goal_node and time_difference:
             adjust_capacities(goal_node, nodes_dict)
@@ -351,13 +366,16 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
         uncertainty_reservation_handling('decrement', intent_name, operation_intent, nodes_dict, intents_dict,
                                          time_delta)
 
-    ip_obj = solve_ip(nodes_dict, edges_dict, intents_dict, time_steps, time_delta)
+    print_solutions(intents_dict)
 
-    return greedy_obj, ip_obj
+    sum_ideal_times = sum(op_intent.ideal_time for op_intent in intents_dict.values())
+    ip_obj -= sum_ideal_times
+
+    return greedy_obj, round(ip_obj, 1)
 
 
 if __name__ == "__main__":
-    example_path = "./examples/spec.json"
+    example_path = "./examples/test4.json"
 
     global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
         read_example(path=example_path)

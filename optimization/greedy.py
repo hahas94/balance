@@ -187,8 +187,8 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
             unvisited_queue.put((current_itself.travel_time, current_itself))
 
     if destination_extended:
-        operation_intent.actual_time = destination_extended.travel_time
-        operation_intent.build_path(destination_extended)
+        operation_intent.actual_greedy_time = destination_extended.travel_time
+        operation_intent.build_greedy_path(destination_extended)
 
     return destination_extended
 

@@ -41,7 +41,7 @@ class Example1(unittest.TestCase):
         self.assertEqual(goal_node.layer, self.destination_layers[index])
 
         # assert actual time is correct
-        self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+        self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
         # assert ideal time is correct
         self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -74,7 +74,7 @@ class Example2(unittest.TestCase):
         self.assertEqual(goal_node.layer, self.destination_layers[index])
 
         # assert actual time is correct
-        self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+        self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
         # assert ideal time is correct
         self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -98,7 +98,7 @@ class Example3(unittest.TestCase):
 
         # assert goal node is reached
         self.assertIs(goal_node, None)
-        self.assertEqual(operation_intent.actual_time, 0)
+        self.assertEqual(operation_intent.actual_greedy_time, 0)
         self.assertEqual(operation_intent.ideal_time, 0)
 
 
@@ -120,7 +120,7 @@ class Example4(unittest.TestCase):
 
         # assert goal node is reached
         self.assertIs(goal_node, None)
-        self.assertEqual(operation_intent.actual_time, 0)
+        self.assertEqual(operation_intent.actual_greedy_time, 0)
         self.assertEqual(operation_intent.ideal_time, 10)
 
 
@@ -151,7 +151,7 @@ class Example5(unittest.TestCase):
         self.assertEqual(goal_node.layer, self.destination_layers[index])
 
         # assert actual time is correct
-        self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+        self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
         # assert ideal time is correct
         self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -184,7 +184,7 @@ class Example6(unittest.TestCase):
         self.assertEqual(goal_node.layer, self.destination_layers[index])
 
         # assert actual time is correct
-        self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+        self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
         # assert ideal time is correct
         self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -217,7 +217,7 @@ class Example7(unittest.TestCase):
             self.assertEqual(goal_node.layer, self.destination_layers[index])
 
             # assert actual time is correct
-            self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+            self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
             # assert ideal time is correct
             self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -252,7 +252,7 @@ class Example8(unittest.TestCase):
             self.assertEqual(goal_node.layer, self.destination_layers[index])
 
             # assert actual time is correct
-            self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+            self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
             # assert ideal time is correct
             self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -289,7 +289,7 @@ class Example9(unittest.TestCase):
             self.assertEqual(goal_node.layer, self.destination_layers[index])
 
             # assert actual time is correct
-            self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+            self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
             # assert ideal time is correct
             self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -326,7 +326,7 @@ class Example10(unittest.TestCase):
             self.assertEqual(goal_node.layer, self.destination_layers[index])
 
             # assert actual time is correct
-            self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+            self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
             # assert ideal time is correct
             self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -371,7 +371,7 @@ class Example11(unittest.TestCase):
             self.assertEqual(goal_node.layer, self.destination_layers[index])
 
             # assert actual time is correct
-            self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+            self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
             # assert ideal time is correct
             self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -419,7 +419,7 @@ class Example12(unittest.TestCase):
             self.assertEqual(goal_node.layer, self.destination_layers[index])
 
             # assert actual time is correct
-            self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+            self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
             # assert ideal time is correct
             self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -463,7 +463,7 @@ class Example13(unittest.TestCase):
             self.assertEqual(goal_node.layer, self.destination_layers[index])
 
             # assert actual time is correct
-            self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+            self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
             # assert ideal time is correct
             self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
@@ -507,7 +507,7 @@ class Example14(unittest.TestCase):
             self.assertEqual(goal_node.layer, self.destination_layers[index])
 
             # assert actual time is correct
-            self.assertEqual(operation_intent.actual_time, self.actual_times[index])
+            self.assertEqual(operation_intent.actual_greedy_time, self.actual_times[index])
 
             # assert ideal time is correct
             self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])

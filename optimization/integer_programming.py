@@ -195,9 +195,38 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     # checking if a solution was found
     if model.num_solutions:
         ip_obj = model.objective_value
-        print(f"ip_obj={ip_obj}")
-        for el in model.vars:
-            print(f"{el}: {el.x}")
+        # print(f"ip_obj={ip_obj}")
+        # for el in model.vars:
+        #     print(f"{el}: {el.x}")
+
+        for d in drones_ids:
+            path = []
+            intent = intents[drones_list[d]]
+            travel_time = 0
+            dep_var = None
+            arr_var = None
+            for t in time_steps_ids:
+                for e in edges_ids:
+                    w = edge_weights_td[e]
+                    dep_var = drones_departure[e][d][t]
+                    arr_var = drones_arrival[e][d][t + (w//time_delta)] if dep_var.x > 0 else arr_var
+                    if dep_var.x > 0:
+                        # (node_name, layer, travel_time, right_most_reserved_layer)
+                        U = intent.time_uncertainty
+                        right_most_reserved_layer = math.ceil(edge_weights[e] + U * int(e < len(edges)))
+                        link = (edges_list[e][0], t, travel_time, right_most_reserved_layer)
+                        travel_time += w
+                        path.append(link)
+
+            # adding arrival link for completeness
+            if arr_var:
+                layer = int(arr_var.name.split('_')[-1]) // time_delta
+                rmsl = math.ceil(layer + intent.time_uncertainty/time_delta)
+                arrival_link = (intent.destination.name, layer, travel_time, rmsl)
+                path.append(arrival_link)
+
+            intent.actual_ip_time = travel_time
+            intent.build_ip_path(path)
 
     return ip_obj
 
