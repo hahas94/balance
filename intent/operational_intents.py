@@ -161,12 +161,12 @@ class Intent:
                                    for index, el in enumerate(self._path_ip)])
             print(f"\t{solution_ip}")
         else:
-            print(f"\tNo solution is possible for this operational intent.\n\n")
+            print(f"\tNo solution is possible for this operational intent.")
 
-            print(f"\tideal time:{self.ideal_time}, "
-                  f"actual greedy time:{self.actual_greedy_time}, "
-                  f"actual ip time: {self._actual_ip_time}, "
-                  f"greedy time difference:{self.greedy_time_difference}, "
-                  f"ip time difference:{self.ip_time_difference}\n\n")
+        print(f"\tideal time:{self.ideal_time}, "
+              f"actual greedy time:{self.actual_greedy_time}, "
+              f"actual ip time: {self._actual_ip_time}, "
+              f"greedy time difference:{self.greedy_time_difference}, "
+              f"ip time difference:{self.ip_time_difference}\n\n")
 
 # =============================================== END OF FILE ===============================================

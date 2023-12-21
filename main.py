@@ -368,14 +368,18 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
 
     print_solutions(intents_dict)
 
-    sum_ideal_times = sum(op_intent.ideal_time for op_intent in intents_dict.values()) if ip_obj > 0 else 0
-    ip_obj -= sum_ideal_times
+    if ip_obj > 0:
+        sum_ideal_times = sum(op_intent.ideal_time for op_intent in intents_dict.values()) if ip_obj > 0 else 0
+        ip_obj -= sum_ideal_times
+        ip_obj = round(ip_obj, 1)
+    else:
+        ip_obj = None
 
-    return greedy_obj, round(ip_obj, 1)
+    return greedy_obj, ip_obj
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test3.json"
+    example_path = "./examples/test14.json"
 
     global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
         read_example(path=example_path)

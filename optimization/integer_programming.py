@@ -75,17 +75,17 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
 
     # ---- Decision variables ----
     # whether drone `d` traverses edge `e` starting at time step `t`
-    drones_departure = [[[model.add_var(name=f"Departure_{edges_list[e]}__Drone_{d}__Time_{t * time_delta}",
+    drones_departure = [[[model.add_var(name=f"Departure_{edges_list[e]}__D{d}__T{t * time_delta}",
                                         var_type=mip.BINARY)
                           for t in time_steps_ids] for d in drones_ids] for e in edges_ids]
 
     # whether drone `d` finishes taking edge `e` at time step `t`
-    drones_arrival = [[[model.add_var(name=f"Arrival_{edges_list[e]}__Drone_{d}__Time_{t * time_delta}",
+    drones_arrival = [[[model.add_var(name=f"Arrival_{edges_list[e]}__D{d}__T_{t * time_delta}",
                                       var_type=mip.BINARY)
                         for t in time_steps_ids] for d in drones_ids] for e in edges_ids]
 
     # whether vertiport `v` is reserved for drone `d` starting at time step `t`
-    vertiport_reserved = [[[model.add_var(name=f"Vertiport_{vertiports_list[v]}__Drone_{d}__Time_{t * time_delta}",
+    vertiport_reserved = [[[model.add_var(name=f"Vertiport_{vertiports_list[v]}__D{d}__T{t * time_delta}",
                                           var_type=mip.BINARY)
                             for t in time_steps_ids]
                            for d in drones_ids]
@@ -102,22 +102,23 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
             k_name = vertiports_list[k]
             incoming_edges = [e for e in edges_ids if edges_list[e][1] == k_name]
             outgoing_edges = [e for e in edges_ids if edges_list[e][0] == k_name]
+            msg = f"Flow conservation constraint__D{d}__{k_name} "
             for t in time_steps_ids:
                 # case 1: where `k` is the origin vertiport and `t` is departure time:
                 if k_name == src and (t*time_delta) == dept_time:
                     model.add_constr(mip.xsum(drones_arrival[e][d][t] for e in incoming_edges)
                                      - mip.xsum(drones_departure[e][d][t] for e in outgoing_edges)
-                                     == -1, "Flow conservation constraint, drone {d} dept vertiport and time.")
+                                     == -1, msg)
                 # case 2: where `k` is the destination vertiport
                 elif k_name == dest:
                     model.add_constr(mip.xsum(drones_arrival[e][d][t] for e in incoming_edges)
                                      - mip.xsum(drones_departure[e][d][t] for e in outgoing_edges)
-                                     <= 1, f"Flow conservation constraint, drone {d}, dest vertiport.")
+                                     <= 1, msg)
                 else:
                     # case 3: other vertiport
                     model.add_constr(mip.xsum(drones_arrival[e][d][t] for e in incoming_edges)
                                      - mip.xsum(drones_departure[e][d][t] for e in outgoing_edges)
-                                     == 0, f"Flow conservation constraint, drone {d}, other vertiports.")
+                                     == 0, msg)
 
     # 2. A vertiport must be reserved for the entire duration of a drone flying towards it, inclusive
     #    the time uncertainties, that is being reserved from start time plus duration and uncertainty.
@@ -153,7 +154,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     #    being start vertiport and at all times before departure, these edges must have value 0.
     for d in drones_ids:
         src = source_vertiports_names[d]
-        departure_time = earliest_departure_times[d]
+        departure_time = earliest_departure_times[d] // time_delta
         earlier_times = range(departure_time)
         valid_edges = [idx for idx in edges_ids if edges_list[idx][0] == src]
         model.add_constr(mip.xsum(drones_departure[e][d][t] for t in earlier_times for e in valid_edges) == 0,
@@ -202,15 +203,14 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     # checking if a solution was found
     if model.num_solutions:
         ip_obj = model.objective_value
-        print(f"ip_obj={ip_obj}")
-        for el in model.vars:
-            print(f"{el}: {el.x}")
+        # print(f"ip_obj={ip_obj}")
+        # for el in model.vars:
+        #     print(f"{el}: {el.x}")
 
         for d in drones_ids:
             path = []
             intent = intents[drones_list[d]]
             travel_time = 0
-            dep_var = None
             arr_var = None
             for t in time_steps_ids:
                 for e in edges_ids:
@@ -232,8 +232,8 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                 arrival_link = (intent.destination.name, layer, travel_time, rmsl)
                 path.append(arrival_link)
 
-            intent.actual_ip_time = travel_time
-            intent.build_ip_path(path)
+                intent.actual_ip_time = travel_time
+                intent.build_ip_path(path)
 
     return ip_obj
 
