@@ -26,11 +26,12 @@ There are a number of constraints to be satisfied:
 The objective of the model is to find the shortest total time of operation for all intents.
 """
 import math
+from typing import Union
 
 import mip
 
 
-def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int) -> float:
+def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int) -> Union[float, None]:
     """
     This function runs an optimization model to find routing solution for each operational intent.
 
@@ -203,9 +204,6 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     # checking if a solution was found
     if model.num_solutions:
         ip_obj = model.objective_value
-        # print(f"ip_obj={ip_obj}")
-        # for el in model.vars:
-        #     print(f"{el}: {el.x}")
 
         for d in drones_ids:
             path = []
@@ -235,6 +233,6 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                 intent.actual_ip_time = travel_time
                 intent.build_ip_path(path)
 
-    return ip_obj
+    return ip_obj if model.num_solutions else None
 
 # =============================================== END OF FILE ===============================================

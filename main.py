@@ -144,7 +144,7 @@ def solve_greedy(operational_intent: intent.Intent, time_delta: int,
     return operational_intent.greedy_time_difference, goal_node
 
 
-def solve_ip(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int):
+def solve_ip(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int) -> Union[float, None]:
     """
     This function calls the ip optimization model to find a schedule for all the intents.
 
@@ -163,8 +163,8 @@ def solve_ip(nodes: dict, edges: dict, intents: dict, time_steps: range, time_de
 
     Returns
     -------
-    ip_obj: float
-        The objective of the model
+    ip_obj: Union[float, None]
+        The objective of the model or none if no solution was found.
 
     """
     ip_obj = optimization.ip_optimization(nodes, edges, intents, time_steps, time_delta)
@@ -323,7 +323,7 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
 
 
 def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int, time_steps: range) \
-        -> Tuple[int, float]:
+        -> Tuple[int, Union[float, None]]:
     """
     The main function that solves each operational intent in sequence,
     as well as solving them all at once.
@@ -350,6 +350,11 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
     greedy_obj: int = 0
 
     ip_obj = solve_ip(nodes_dict, edges_dict, intents_dict, time_steps, time_delta)
+
+    # in case the ip model is unsolvable for this instance due to short time horizon, quit and rerun with longer time.
+    if ip_obj is None:
+        return greedy_obj, ip_obj
+
     for intent_name, operation_intent in intents_dict.items():
         # for each previous drone, get path, update vertiport capacities
         uncertainty_reservation_handling('increment', intent_name, operation_intent, nodes_dict, intents_dict,
@@ -368,29 +373,33 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
 
     print_solutions(intents_dict)
 
-    if ip_obj > 0:
-        sum_ideal_times = sum(op_intent.ideal_time for op_intent in intents_dict.values()) if ip_obj > 0 else 0
-        ip_obj -= sum_ideal_times
-        ip_obj = round(ip_obj, 1)
-    else:
-        ip_obj = None
+    sum_ideal_times = sum(op_intent.ideal_time for op_intent in intents_dict.values())
+    ip_obj -= sum_ideal_times
+    ip_obj = round(ip_obj, 1)
 
     return greedy_obj, ip_obj
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test14.json"
+    example_path = "./examples/test11.json"
+    ip_objective = None
+    greedy_objective = 0
+    time_horizon_extender = 1
 
-    global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
-        read_example(path=example_path)
+    while ip_objective is None:
+        global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
+            read_example(path=example_path)
 
-    global_nodes_dict, global_edges_dict, global_intents_dict = \
-        create_dicts(global_nodes, global_edges, global_intents, global_time_horizon, global_time_delta)
+        global_time_horizon *= time_horizon_extender
 
-    global_time_steps = range(global_start, global_time_horizon+1, global_time_delta)
+        global_nodes_dict, global_edges_dict, global_intents_dict = \
+            create_dicts(global_nodes, global_edges, global_intents, global_time_horizon, global_time_delta)
 
-    greedy_objective, ip_objective = main(global_nodes_dict, global_edges_dict, global_intents_dict,
-                                          global_time_delta, global_time_steps)
+        global_time_steps = range(global_start, global_time_horizon + 1, global_time_delta)
+
+        greedy_objective, ip_objective = main(global_nodes_dict, global_edges_dict, global_intents_dict,
+                                              global_time_delta, global_time_steps)
+        time_horizon_extender += 1
 
     print(f"Greedy objective: {greedy_objective}\nInteger programming objective: {ip_objective}")
 
