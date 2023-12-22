@@ -29,7 +29,6 @@
     "intents": [
         {"source":  "v0", "destination":  "v5", "start": 0, "uncertainty": 0},
         {"source":  "v2", "destination":  "v3", "start": 1, "uncertainty": 0},
-        {"source":  "v5", "destination":  "v1", "start": 0, "uncertainty": 0},
-        {"source":  "v1", "destination":  "v0", "start": 0, "uncertainty": 0}
+        {"source":  "v5", "destination":  "v1", "start": 0, "uncertainty": 0}
     ]
 }

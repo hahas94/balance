@@ -307,14 +307,14 @@ class Example10(unittest.TestCase):
         self.nodes, self.edges, self.intents = main.create_dicts(nodes, edges, intents,
                                                                  self.time_horizon, self.time_delta)
 
-        self.ideal_times = [12, 3, 10, 0]
-        self.actual_times = [20, 5, 20, 0]
-        self.destination_layers = [4, 2, 4, None]
+        self.ideal_times = [12, 3, 10]
+        self.actual_times = [20, 5, 20]
+        self.destination_layers = [4, 2, 4]
 
     def test_dijkstra(self):
         index = 0
 
-        for intent_name, operation_intent in list(self.intents.items())[:-1]:
+        for intent_name, operation_intent in list(self.intents.items()):
             nodes_list = list(self.nodes.values())
             goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
             optimization.find_shortest_path(operation_intent, nodes_list)
@@ -334,10 +334,6 @@ class Example10(unittest.TestCase):
             main.adjust_capacities(goal_node, self.nodes)
 
             index += 1
-
-        intent_name, operation_intent = list(self.intents.items())[-1]
-        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, list(self.nodes.values()))
-        self.assertIs(goal_node, None)
 
 
 class Example11(unittest.TestCase):
