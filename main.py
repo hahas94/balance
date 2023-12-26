@@ -223,17 +223,18 @@ def increment_reservations(time_uncertainty: int, path: List[Tuple[str, int, int
         delta: int
             Time discretization delta
         indices: Sequence
-            Indices of the vertiports that are affected.
+            Indices of nodes in the path whose capacity will possibly be modified.
 
     Returns:
 
     """
     decrementor = int(math.copysign(1, time_uncertainty))  # sign of time_uncertainty
+
     for index in indices:
         name = path[index][0]
         previous_layer, start_time = path[index-1][1:3]
-        new_left_layer = (start_time - decrementor*time_uncertainty) // delta
-        l, r = max(0, new_left_layer), previous_layer+1
+        new_left_layer = (start_time - decrementor*time_uncertainty + 1) // delta
+        l, r = max(1, new_left_layer), previous_layer+1
         nodes_dict[name].layer_capacities[l:r] = [cap-decrementor for cap in nodes_dict[name].layer_capacities[l:r]]
 
     return None
@@ -267,10 +268,11 @@ def decrement_reservations(time_uncertainties: List[int], prev_intent_path: List
     # find if the two intents have a common vertiport and their uncertainty buffers intersect at that vertiport
     for ind_p, prev_node in enumerate(prev_intent_path[1:]):
         for ind_c, curr_node in enumerate(curr_intent_path[1:]):
-            prev_intent_reaches_before = prev_node[3] < curr_intent_path[ind_c][1]
-            prev_intent_starts_after = prev_intent_path[ind_p][1] > curr_node[3]
-            if prev_node[0] == curr_node[0] and not (prev_intent_reaches_before or prev_intent_starts_after):
-                common_nodes.append(prev_node)
+            if prev_node[0] == curr_node[0]:
+                prev_intent_reaches_before = prev_node[3] <= curr_intent_path[ind_c][1]
+                prev_intent_starts_after = prev_intent_path[ind_p][1] >= curr_node[3]
+                if not (prev_intent_reaches_before or prev_intent_starts_after):
+                    common_nodes.append(prev_node)
                 break
 
     # for each vertiport in prev_intent_path, if it is not a common vertiport, decrement its cap

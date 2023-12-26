@@ -182,7 +182,7 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
         if ground_delay_possible:
             current_itself = create_extended_node(current_node.original.name, curr_layer + 1, current_node,
                                                   current_node.original, current_node.travel_time + delta,
-                                                  index + 1, curr_layer + 1, curr_layer + 2, 0)
+                                                  index + 1, curr_layer + 1, curr_layer + 2, 1)
             distances[current_itself.name] = current_itself.travel_time
             unvisited_queue.put((current_itself.travel_time, current_itself))
 
