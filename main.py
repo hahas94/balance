@@ -284,7 +284,7 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
                                      nodes_dict: dict, intents_dict: dict, time_delta: int) -> None:
     """
     When planning an intent, previously scheduled intents must be safe from this current intent being delayed,
-    hence the vertiports along all the paths of the previous intents are eserved for longer time.
+    hence the vertiports along all the paths of the previous intents are reserved for longer time.
 
     When the current intent is scheduled, then all the vertiports that were reserved for longer time but
     that are not included in the path of this current intent are being freed from that extra reservation.
@@ -363,7 +363,7 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
         # solve intent
         time_difference, goal_node = solve_greedy(operation_intent, time_delta, list(nodes_dict.values()))
 
-        if goal_node and time_difference:
+        if goal_node:
             adjust_capacities(goal_node, nodes_dict)
             greedy_obj += time_difference
 
@@ -381,7 +381,7 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test11.json"
+    example_path = "./examples/test14.json"
     ip_objective = None
     greedy_objective = 0
     time_horizon_extender = 1
