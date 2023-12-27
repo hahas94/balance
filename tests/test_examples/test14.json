@@ -16,7 +16,7 @@
         {"source":  "v2", "destination":  "v1", "weight": 3}
     ],
     "intents": [
-        {"source":  "v0", "destination":  "v4", "start": 0, "uncertainty": 3},
+        {"source":  "v0", "destination":  "v4", "start": 0, "uncertainty": 2},
         {"source":  "v2", "destination":  "v4", "start": 6, "uncertainty": 2}
     ]
 }
