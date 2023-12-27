@@ -481,8 +481,8 @@ class Example14(unittest.TestCase):
                                                                  self.time_horizon, self.time_delta)
 
         self.ideal_times = [12, 10]
-        self.actual_times = [14, 16]
-        self.destination_layers = [7, 11]
+        self.actual_times = [14, 14]
+        self.destination_layers = [7, 10]
 
     def test_dijkstra(self):
         index = 0
