@@ -86,11 +86,9 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                         for t in time_steps_ids] for d in drones_ids] for e in edges_ids]
 
     # whether vertiport `v` is reserved for drone `d` starting at time step `t`
-    vertiport_reserved = [[[model.add_var(name=f"Vertiport_{vertiports_list[v]}__D{d}__T{t * time_delta}",
+    vertiport_reserved = [[[model.add_var(name=f"Vertiport_{vertiports_list[v]}__D{d}__T_{t * time_delta}",
                                           var_type=mip.BINARY)
-                            for t in time_steps_ids]
-                           for d in drones_ids]
-                          for v in vertiports_ids]
+                            for t in time_steps_ids] for d in drones_ids] for v in vertiports_ids]
 
     # ---- Constraints ----
     # 1. Flow conservation, meaning for each drone and for each vertiport other than departure
@@ -132,7 +130,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
             weight_uncertainty = [
                 math.ceil((edge_weights[idx]+U*int(idx < len(edges))) / time_delta) for idx in valid_edges
             ]
-            for t in time_steps_ids:
+            for t in time_steps_ids[:-1]:
                 T = time_steps_ids[-1]
                 ub = math.ceil((t*time_delta + U) / time_delta)
                 time_ranges = [range(max(0, t - weight_uncertainty[idx] + 1), min(ub if idx < len(edges) else t, T) + 1)
@@ -140,7 +138,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                 model.add_constr(
                     (1 / M) * mip.xsum(drones_departure[e][d][tau] for indx, e in enumerate(valid_edges)
                                        for tau in time_ranges[indx])
-                    <= vertiport_reserved[v][d][t],
+                    <= vertiport_reserved[v][d][t+1],
                     f"Reservation constraint Vertiport_{v}__Drone_{d}__Time_{t*time_delta}")
 
     # 3. A vertiport cannot be overcapacitated at any point in time, meaning sum
@@ -204,6 +202,17 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     # checking if a solution was found
     if model.num_solutions:
         ip_obj = model.objective_value
+
+        # Creating the layers reservations dict
+        # reservations = {v: (time_steps_ids[-1]+1)*[0] for v in vertiports_list}
+        # for var in model.vars:
+        #     if var.name[:3] == "Ver" and var.x == 1:
+        #         word_lst = var.name.split('_')
+        #         name = word_lst[1]
+        #         time = int(word_lst[-1])
+        #         reservations[name][time] = var.x
+        # for k, v in reservations.items():
+        #     print(f"{k}: {v}")
 
         for d in drones_ids:
             path = []
