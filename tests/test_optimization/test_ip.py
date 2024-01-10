@@ -204,7 +204,7 @@ class Example11(unittest.TestCase):
 
         self.time_steps = range(self.start, self.time_horizon + 1, self.time_delta)
 
-        self.actual_time = None
+        self.actual_time = 32
 
     def test_ip(self):
         ip_obj = optimization.ip_optimization(self.nodes, self.edges, self.intents, self.time_steps, self.time_delta)
@@ -258,7 +258,7 @@ class Example14(unittest.TestCase):
 
         self.time_steps = range(self.start, self.time_horizon + 1, self.time_delta)
 
-        self.actual_time = 30
+        self.actual_time = 28
 
     def test_ip(self):
         ip_obj = optimization.ip_optimization(self.nodes, self.edges, self.intents, self.time_steps, self.time_delta)
