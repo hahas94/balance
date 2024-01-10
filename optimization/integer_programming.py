@@ -127,9 +127,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
         for d in drones_ids:
             U = intents[drones_list[d]].time_uncertainty
             # edge weights with drone uncertainty added to them, except for edges indicating ground delay.
-            weight_uncertainty = [
-                math.ceil((edge_weights[idx]+U*int(idx < len(edges))) / time_delta) for idx in valid_edges
-            ]
+            weight_uncertainty = [math.ceil(edge_weights[idx] / time_delta) for idx in valid_edges]
             for t in time_steps_ids[:-1]:
                 T = time_steps_ids[-1]
                 ub = math.ceil((t*time_delta + U) / time_delta)
@@ -204,15 +202,15 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
         ip_obj = model.objective_value
 
         # Creating the layers reservations dict
-        # reservations = {v: (time_steps_ids[-1]+1)*[0] for v in vertiports_list}
-        # for var in model.vars:
-        #     if var.name[:3] == "Ver" and var.x == 1:
-        #         word_lst = var.name.split('_')
-        #         name = word_lst[1]
-        #         time = int(word_lst[-1])
-        #         reservations[name][time] = var.x
-        # for k, v in reservations.items():
-        #     print(f"{k}: {v}")
+        reservations = {v: (time_steps_ids[-1]+1)*[0] for v in vertiports_list}
+        for var in model.vars:
+            if var.name[:3] == "Ver" and var.x == 1:
+                word_lst = var.name.split('_')
+                name = word_lst[1]
+                time = int(word_lst[-1]) // time_delta
+                reservations[name][time] = var.x
+        for k, v in reservations.items():
+            print(f"{k}: {v}")
 
         for d in drones_ids:
             path = []
