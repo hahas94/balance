@@ -325,7 +325,7 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
 
 
 def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int, time_steps: range) \
-        -> Tuple[int, Union[float, None]]:
+        -> Tuple[Union[int, None], Union[float, None]]:
     """
     The main function that solves each operational intent in sequence,
     as well as solving them all at once.
@@ -349,7 +349,7 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
             The ip optimization objective
 
     """
-    greedy_obj: int = 0
+    greedy_obj: Union[int, None] = 0
 
     ip_obj = solve_ip(nodes_dict, edges_dict, intents_dict, time_steps, time_delta)
 
@@ -368,11 +368,18 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
         if goal_node:
             adjust_capacities(goal_node, nodes_dict)
             greedy_obj += time_difference
+        else:
+            # no solution found, so exit
+            return ip_obj, None
 
         # for each previous drone, get path, update vertiport capacities
         uncertainty_reservation_handling('decrement', intent_name, operation_intent, nodes_dict, intents_dict,
                                          time_delta)
 
+    #
+    # At this point, make sanity checks for both method's solutions and ensure their correctness
+    # If some check fails, raise an appropriate error
+    #
     print_solutions(intents_dict)
 
     sum_ideal_times = sum(op_intent.ideal_time for op_intent in intents_dict.values())
@@ -383,12 +390,12 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test14.json"
+    example_path = "./examples/test11.json"
     ip_objective = None
-    greedy_objective = 0
+    greedy_objective = None
     time_horizon_extender = 1
 
-    while ip_objective is None:
+    while ip_objective is None or greedy_objective is None:
         global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
             read_example(path=example_path)
 
