@@ -30,6 +30,8 @@ from typing import Union
 
 import mip
 
+import utils
+
 
 def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int) -> Union[float, None]:
     """
@@ -126,12 +128,13 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
         valid_edges = [idx for idx in edges_ids if edges_list[idx][1] == vertiports_list[v]]
         for d in drones_ids:
             U = intents[drones_list[d]].time_uncertainty
-            # edge weights with drone uncertainty added to them, except for edges indicating ground delay.
-            weight_uncertainty = [math.ceil(edge_weights[idx] / time_delta) for idx in valid_edges]
+            # edge weights in terms of time delta plus right time uncertainty
+            weight_uncertainty = [
+                math.ceil((edge_weights[idx] + U * int(idx < len(edges))) / time_delta) for idx in valid_edges
+            ]
             for t in time_steps_ids[:-1]:
                 T = time_steps_ids[-1]
-                ub = math.ceil((t*time_delta + U) / time_delta)
-                time_ranges = [range(max(0, t - weight_uncertainty[idx] + 1), min(ub if idx < len(edges) else t, T) + 1)
+                time_ranges = [range(max(0, t - weight_uncertainty[idx] + 1), min(t, T) + 1)
                                for idx, _ in enumerate(valid_edges)]
                 model.add_constr(
                     (1 / M) * mip.xsum(drones_departure[e][d][tau] for indx, e in enumerate(valid_edges)
@@ -194,6 +197,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                                 for e in edges_ids for d in drones_ids for t in time_steps_ids)
                        + mip.xsum(vertiport_reserved[v][d][t]
                                   for t in time_steps_ids for d in drones_ids for v in vertiports_ids)/9999999)
+    model.verbose = 0
     model.optimize()
 
     # ---- Output ----
@@ -202,39 +206,67 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
         ip_obj = model.objective_value
 
         # Creating the layers reservations dict
-        reservations = {v: (time_steps_ids[-1]+1)*[0] for v in vertiports_list}
+        reservations = {v: (time_steps_ids[-1]+1)*[nodes[v].capacity] for v in vertiports_list}
         for var in model.vars:
             if var.name[:3] == "Ver" and var.x == 1:
                 word_lst = var.name.split('_')
                 name = word_lst[1]
                 time = int(word_lst[-1]) // time_delta
-                reservations[name][time] = var.x
-        for k, v in reservations.items():
-            print(f"{k}: {v}")
+                reservations[name][time] -= int(var.x)
+        # for k, v in reservations.items():
+        #     print(f"{k}: {v}")
 
+        # build the path of each drone
         for d in drones_ids:
             path = []
             intent = intents[drones_list[d]]
             travel_time = 0
+            right_most_reserved_layer = 0
+            left_most_reserved_layer = 0
             arr_var = None
+            arrival_vertiport_name = ''
             for t in time_steps_ids:
                 for e in edges_ids:
+                    vertiport_name = edges_list[e][0]
+                    reserved_layers = []
                     w = edge_weights_td[e]
                     dep_var = drones_departure[e][d][t]
                     arr_var = drones_arrival[e][d][t + (w//time_delta)] if dep_var.x > 0 else arr_var
                     if dep_var.x > 0:
-                        # (node_name, layer, travel_time, right_most_reserved_layer)
-                        U = intent.time_uncertainty
-                        right_most_reserved_layer = math.ceil(edge_weights[e] + U * int(e < len(edges)))
-                        link = (edges_list[e][0], t, travel_time, right_most_reserved_layer)
+                        arrival_vertiport_name = edges_list[e][1]
+                        for t_step in time_steps_ids:
+                            if vertiport_reserved[vertiports_list.index(vertiport_name)][d][t_step].x > 0:
+                                reserved_layers.append(t_step)
+
+                        right_most_reserved_layer = max(reserved_layers) if len(reserved_layers) > 0 else (
+                            right_most_reserved_layer)
+                        left_most_reserved_layer = min(reserved_layers) if len(reserved_layers) > 0 else (
+                            left_most_reserved_layer)
+
+                        link = utils.Link(name=vertiport_name, layer=t, travel_time=travel_time,
+                                          left_reserved_layer=left_most_reserved_layer,
+                                          right_reserved_layer=right_most_reserved_layer)
+
                         travel_time += w
                         path.append(link)
 
             # adding arrival link for completeness
             if arr_var:
+                reserved_layers = []
                 layer = int(arr_var.name.split('_')[-1]) // time_delta
-                rmsl = math.ceil(layer + intent.time_uncertainty/time_delta)
-                arrival_link = (intent.destination.name, layer, travel_time, rmsl)
+
+                for t_step in time_steps_ids:
+                    if vertiport_reserved[vertiports_list.index(arrival_vertiport_name)][d][t_step].x > 0:
+                        reserved_layers.append(t_step)
+
+                right_most_reserved_layer = max(reserved_layers) if len(reserved_layers) > 0 else (
+                    right_most_reserved_layer)
+                left_most_reserved_layer = min(reserved_layers) if len(reserved_layers) > 0 else (
+                    left_most_reserved_layer)
+
+                arrival_link = utils.Link(name=intent.destination.name, layer=layer, travel_time=travel_time,
+                                          left_reserved_layer=left_most_reserved_layer,
+                                          right_reserved_layer=right_most_reserved_layer)
                 path.append(arrival_link)
 
                 intent.actual_ip_time = travel_time
