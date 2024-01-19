@@ -12,10 +12,21 @@ To run this file, define the path to an example json file first, then run. Examp
 import json
 import math
 from typing import List, Dict, Sequence, Tuple, Union
+import time
+import datetime
 
+import checks
 import graph
 import intent
 import optimization
+import utils
+
+
+class InvalidSolutionError(Exception):
+    """A custom exception class to be raised when either of the two methods produce invalid solutions."""
+    def __init__(self, message=None):
+        super().__init__(message)
+        self.message = message
 
 
 def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List[Dict]]:
@@ -207,8 +218,8 @@ def adjust_capacities(goal_node: graph.ExtendedNode, nodes_dict: Dict[str, graph
         nodes_dict[node].layer_capacities = layer_cap
 
 
-def increment_reservations(time_uncertainty: int, path: List[Tuple[str, int, int, int]], nodes_dict: dict,
-                           delta: int, indices: Sequence) -> None:
+def increment_reservations(time_uncertainty: int, prev_intent, nodes_dict: dict,  delta: int,
+                           indices: Sequence = None) -> None:
     """
     Increments reservations of the vertiports of a scheduled operational intent
     to mitigate the uncertainty of an operation after it in the queue.
@@ -216,68 +227,77 @@ def increment_reservations(time_uncertainty: int, path: List[Tuple[str, int, int
     Args:
         time_uncertainty: int
             Time uncertainty of an operation down in the intents queue.
-        path: List[Tuple[str, int, int, int]]
-            The path taken by the current operation.
+        prev_intent: intents.Intent
+            A scheduled operational intent.
         nodes_dict: dict
             Dictionary of nodes objects and their names.
         delta: int
             Time discretization delta
-        indices: Sequence
-            Indices of nodes in the path whose capacity will possibly be modified.
+        indices: Sequence (optinal)
+            A sequence of indices used for looping over a path.
 
     Returns:
 
     """
     decrementor = int(math.copysign(1, time_uncertainty))  # sign of time_uncertainty
+    path = prev_intent.path_greedy
+    indices = indices if indices else range(1, len(path))
 
     for index in indices:
-        name = path[index][0]
-        previous_layer, start_time = path[index-1][1:3]
-        new_left_layer = (start_time - decrementor*time_uncertainty + 1) // delta
-        l, r = max(1, new_left_layer), previous_layer+1
-        nodes_dict[name].layer_capacities[l:r] = [cap-decrementor for cap in nodes_dict[name].layer_capacities[l:r]]
+        name = path[index].name
+        prev_name = path[index-1].name
+
+        if name != prev_name:
+            previous_layer, start_time = path[index-1].layer, path[index-1].layer*delta
+            new_left_layer = (start_time - decrementor*time_uncertainty + 1) // delta
+            l, r = max(1, new_left_layer), previous_layer+1
+            # if previously set let layer, adjust it
+            if prev_intent.path_greedy[index].probably_left_reserved_layer:
+                prev_intent.path_greedy[index].probably_left_reserved_layer += decrementor*time_uncertainty
+            else:
+                prev_intent.path_greedy[index].probably_left_reserved_layer = new_left_layer
+            nodes_dict[name].layer_capacities[l:r] = [cap-decrementor for cap in nodes_dict[name].layer_capacities[l:r]]
 
     return None
 
 
-def decrement_reservations(time_uncertainties: List[int], prev_intent_path: List[Tuple[str, int, int, int]],
-                           curr_intent_path: List[Tuple[str, int, int, int]], nodes_dict: dict, delta: int) -> None:
+def decrement_reservations(prev_intent: intent.Intent, curr_intent: intent.Intent, nodes_dict: dict, delta: int) \
+        -> None:
     """
     Undoing `increment_reservations(...)` for the vertiports not being common of
     the two intents or that their uncertainty buffers don't intersect.
 
     Args:
-        time_uncertainties: List[int]
-            Time uncertainties of the already scheduled intent and the intent currently being scheduled.
-        prev_intent_path: List[Tuple[str, int, int, int]
-            The path taken by the scheduled operation.
-        curr_intent_path: List[Tuple[str, int, int, int]
-            The path taken by the intent being scheduled.
+        prev_intent: intent.Intent
+            Previously scheduled intent
+        curr_intent: intent.Intent
+            An intent being scheduled currently.
         nodes_dict: dict
             Dictionary of nodes objects and their names.
         delta: int
             Time discretization delta
 
     Returns:
-
     """
     # find common vertiports, based on name as well as time intersection
     common_nodes = []
-    u_prev, u_curr = time_uncertainties
+    u_prev, u_curr = [prev_intent.time_uncertainty, curr_intent.time_uncertainty]
+    prev_intent_path: List[utils.Link] = prev_intent.path_greedy
+    curr_intent_path: List[utils.Link] = curr_intent.path_greedy
 
     # find if the two intents have a common vertiport and their uncertainty buffers intersect at that vertiport
     for ind_p, prev_node in enumerate(prev_intent_path[1:]):
         for ind_c, curr_node in enumerate(curr_intent_path[1:]):
-            if prev_node[0] == curr_node[0]:
-                prev_intent_reaches_before = prev_node[3] <= curr_intent_path[ind_c][1]
-                prev_intent_starts_after = prev_intent_path[ind_p][1] >= curr_node[3]
+            if prev_node.name == curr_node.name:
+                prev_intent_reaches_before = prev_node.right_reserved_layer <= curr_intent_path[ind_c].layer
+                prev_intent_starts_after = prev_intent_path[ind_p].layer >= curr_node.right_reserved_layer
                 if not (prev_intent_reaches_before or prev_intent_starts_after):
                     common_nodes.append(prev_node)
                 break
 
     # for each vertiport in prev_intent_path, if it is not a common vertiport, decrement its cap
     indices = [i for i in range(1, len(prev_intent_path)) if prev_intent_path[i] not in common_nodes]
-    increment_reservations(-u_curr, prev_intent_path, nodes_dict, delta, indices)
+    increment_reservations(-u_curr, prev_intent, nodes_dict, delta, indices)
 
     return None
 
@@ -315,17 +335,16 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
     for prev_intent_name, prev_intent in intents_dict.items():
         if prev_intent_name == curr_intent_name:
             break
-        p_path = prev_intent.path_greedy
+        # p_path = prev_intent.path_greedy
         if res_type == 'increment':
-            increment_reservations(curr_u, p_path, nodes_dict, time_delta, range(1, len(p_path)))
+            increment_reservations(curr_u, prev_intent, nodes_dict, time_delta)
         elif res_type == 'decrement':
-            decrement_reservations([prev_intent.time_uncertainty, curr_u], p_path, curr_intent.path_greedy, nodes_dict,
-                                   time_delta)
+            decrement_reservations(prev_intent, curr_intent, nodes_dict, time_delta)
     return None
 
 
-def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int, time_steps: range) \
-        -> Tuple[Union[int, None], Union[float, None]]:
+def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int, time_steps: range,
+         verbose: bool = True) -> Tuple[Union[int, None], Union[float, None]]:
     """
     The main function that solves each operational intent in sequence,
     as well as solving them all at once.
@@ -341,6 +360,8 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
             Time discretization delta
         time_steps: range
             A range object for the discretized time steps.
+        verbose: bool
+            Whether to print solutions or not.
 
     Returns:
         greedy_obj: int
@@ -351,12 +372,18 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
     """
     greedy_obj: Union[int, None] = 0
 
+    start_ip = time.perf_counter()
     ip_obj = solve_ip(nodes_dict, edges_dict, intents_dict, time_steps, time_delta)
+    end_ip = time.perf_counter()
+    ip_solution_time = str(datetime.timedelta(seconds=round(end_ip-start_ip, 2)))
 
     # in case the ip model is unsolvable for this instance due to short time horizon, quit and rerun with longer time.
     if ip_obj is None:
         return greedy_obj, ip_obj
 
+    print(f"Integer Programming runtime: {ip_solution_time}")  # remove when finished with debugging solving times
+
+    start_greedy = time.perf_counter()
     for intent_name, operation_intent in intents_dict.items():
         # for each previous drone, get path, update vertiport capacities
         uncertainty_reservation_handling('increment', intent_name, operation_intent, nodes_dict, intents_dict,
@@ -365,7 +392,7 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
         # solve intent
         time_difference, goal_node = solve_greedy(operation_intent, time_delta, list(nodes_dict.values()))
 
-        if goal_node:
+        if goal_node and time_difference is not None:
             adjust_capacities(goal_node, nodes_dict)
             greedy_obj += time_difference
         else:
@@ -375,12 +402,18 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
         # for each previous drone, get path, update vertiport capacities
         uncertainty_reservation_handling('decrement', intent_name, operation_intent, nodes_dict, intents_dict,
                                          time_delta)
+    end_greedy = time.perf_counter()
+    greedy_solution_time = str(datetime.timedelta(seconds=round(end_greedy-start_greedy, 2)))
 
-    #
-    # At this point, make sanity checks for both method's solutions and ensure their correctness
-    # If some check fails, raise an appropriate error
-    #
-    print_solutions(intents_dict)
+    time_horizon = time_steps[-1]
+    valid_solutions = checks.sanity_check(intents_dict, nodes_dict, edges_dict, time_delta, time_horizon)
+
+    if not valid_solutions:
+        raise InvalidSolutionError("Invalid solutions!")
+
+    if verbose:
+        print_solutions(intents_dict)
+    print(f"Integer Programming runtime: {ip_solution_time}\nGreedy runtime: {greedy_solution_time}")
 
     sum_ideal_times = sum(op_intent.ideal_time for op_intent in intents_dict.values())
     ip_obj -= sum_ideal_times
@@ -390,7 +423,7 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test11.json"
+    example_path = "./examples/test4.json"
     ip_objective = None
     greedy_objective = None
     time_horizon_extender = 1
