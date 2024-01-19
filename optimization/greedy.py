@@ -90,7 +90,7 @@ def create_extended_node(name: str, layer: int, previous: graph.ExtendedNode, or
     extended = graph.ExtendedNode(name, layer, previous, original, travel_time)
     extended.insertion_order = insertion_order
     extended.uncertainty_layer = previous.layer + n_deltas_uncertainty
-    extended.capacities = copy.deepcopy(previous.capacities)
+    extended.capacities = {key: val.copy() for key, val in previous.capacities.items()}
     extended.decrement_capacity(name, start, stop)
 
     return extended
@@ -135,8 +135,13 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
     destination_extended: Union[None, graph.ExtendedNode] = None
     distances: Dict[str, Union[float, int]] = {start_node_extended.name: 0}
 
+    # this constant can be used to make nodes representing ground delay to be of less priority than other nodes.
+    GROUND_DELAY_PRIORITY_DECREMENTOR = 1e6
+
     while not unvisited_queue.empty():
         current_dist, current_node = unvisited_queue.get()
+        if current_node.original == source_node and current_dist >= GROUND_DELAY_PRIORITY_DECREMENTOR:
+            current_dist -= GROUND_DELAY_PRIORITY_DECREMENTOR
         curr_layer = current_node.layer
 
         # goal check
@@ -157,7 +162,7 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
             n_deltas_uncertainty = k1 + (r1 > 0)
             new_weight = n_deltas * delta
             v_travel_time = current_dist + new_weight
-            v_extended_name = v.name + str(current_node.layer + n_deltas)
+            v_extended_name = v.name + '_' + str(current_node.layer + n_deltas)
 
             # checking whether this neighbor has been explored previously
             try:
@@ -184,7 +189,7 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
                                                   current_node.original, current_node.travel_time + delta,
                                                   index + 1, curr_layer + 1, curr_layer + 2, 1)
             distances[current_itself.name] = current_itself.travel_time
-            unvisited_queue.put((current_itself.travel_time, current_itself))
+            unvisited_queue.put((current_itself.travel_time + GROUND_DELAY_PRIORITY_DECREMENTOR, current_itself))
 
     if destination_extended:
         operation_intent.actual_greedy_time = destination_extended.travel_time
