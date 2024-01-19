@@ -9,6 +9,8 @@ from typing import List, Tuple, Union
 
 import graph
 
+import utils
+
 
 class Intent:
     """Implements an Operational intent object, which represents a drone operation."""
@@ -28,9 +30,10 @@ class Intent:
         self._destination = destination
         self._start = start
         self._time_uncertainty = uncertainty
-        # the path between `source` and `destination`. (node_name, layer, travel_time, right_most_reserved_layer)
-        self._path_greedy: List[Tuple[str, int, int, int]] = []
-        self._path_ip: List[Tuple[str, int, int, int]] = []
+        # A link in the path between `source` and `destination`. Each link has the following instance variables:
+        # name, layer, travel_time, left_most_reserved_layer, right_most_reserved_layer
+        self._path_greedy: List[utils.Link] = []
+        self._path_ip: List[utils.Link] = []
         self._actual_greedy_time = 0
         self._actual_ip_time = 0
         self._ideal_time = 0
@@ -117,8 +120,9 @@ class Intent:
     def build_greedy_path(self, goal_node: Union[None, graph.ExtendedNode]) -> None:
         """Given a goal node, it backtracks on it to create a path from start to destination."""
         while goal_node is not None:
-            self._path_greedy.insert(0, (goal_node.original.name, goal_node.layer, goal_node.travel_time,
-                                         goal_node.uncertainty_layer))
+            link = utils.Link(name=goal_node.original.name, layer=goal_node.layer, travel_time=goal_node.travel_time,
+                              left_reserved_layer=None, right_reserved_layer=goal_node.uncertainty_layer)
+            self._path_greedy.insert(0, link)
             goal_node = goal_node.previous
         self._greedy_solution_found = True
 
@@ -148,17 +152,18 @@ class Intent:
         The greedy and ip solutions are printed one fter another.
         """
         if self._greedy_solution_found:
-            solution_greedy = "".join([f"[node:{el[0]}, layer:{el[1]}, time:{self._start+el[2]}]" +
+            solution_greedy = "".join([f"[node:{link.name}, layer:{link.layer}, "
+                                       f"travel_time:{self._start+link.travel_time}]" +
                                        (" --> " if index < len(self._path_greedy) - 1 else "")
-                                       for index, el in enumerate(self._path_greedy)])
+                                       for index, link in enumerate(self._path_greedy)])
             print(f"\t{solution_greedy}")
         else:
             print(f"\tNo solution is possible for this operational intent.")
 
         if self._ip_solution_found:
-            solution_ip = "".join([f"[node:{el[0]}, layer:{el[1]}, time:{self._start + el[2]}]" +
+            solution_ip = "".join([f"[node:{link.name}, layer:{link.layer}, travel_time:{self._start + link.travel_time}]" +
                                    (" --> " if index < len(self._path_ip) - 1 else "")
-                                   for index, el in enumerate(self._path_ip)])
+                                   for index, link in enumerate(self._path_ip)])
             print(f"\t{solution_ip}")
         else:
             print(f"\tNo solution is possible for this operational intent.")
