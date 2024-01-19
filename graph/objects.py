@@ -9,6 +9,7 @@ a node object in a time-extended network.
 from __future__ import annotations  # Needed for forward declarations
 
 from typing import List, Dict, Union
+import numpy as np
 
 
 class Node:
@@ -105,7 +106,7 @@ class ExtendedNode:
             travel_time: int
                 Time it took to reach this node from start.
         """
-        self._name = name + f"{layer}"  # node name is `original_name`+`Layer`
+        self._name = name + f"_{layer}"  # node name is `original_name`+`Layer`
         self._layer = layer
         self._previous = previous
         self._original = original
@@ -188,13 +189,10 @@ class ExtendedNode:
             return value: bool
                 Node has necessary capacity (True) or not (False).
         """
-        bools_list = []
-        for layer in range(start, stop):
-            try:
-                bools_list.append(self._capacities_dict[name][layer] > 0)
-            except IndexError as _:
-                bools_list.append(False)
-        return False not in bools_list
+        layers_array = np.array(self._capacities_dict[name])
+        if start < 0 or stop > len(layers_array):
+            return False
+        return np.all(layers_array[start:stop] > 0)
 
     def decrement_capacity(self, name: str, start: int, stop: int) -> None:
         """
@@ -211,8 +209,9 @@ class ExtendedNode:
         Returns:
 
         """
-        for layer in range(start, stop):
-            self._capacities_dict[name][layer] -= 1
+        layers_array = np.array(self._capacities_dict[name])
+        layers_array[start:stop] -= 1
+        self._capacities_dict[name] = layers_array.tolist()
 
 
 class Edge:
