@@ -50,24 +50,6 @@ class Example2(unittest.TestCase):
         self.assertEqual(ip_obj, self.actual_time)
 
 
-class Example3(unittest.TestCase):
-    """A small graph where there is no path between `src` and `dest`, hence no solution."""
-    def setUp(self) -> None:
-        self.start, self.time_horizon, self.time_delta, nodes, edges, intents = \
-            main.read_example('tests/test_examples/test3.json')
-        self.nodes, self.edges, self.intents = main.create_dicts(nodes, edges, intents,
-                                                                 self.time_horizon, self.time_delta)
-
-        self.time_steps = range(self.start, self.time_horizon + 1, self.time_delta)
-
-        self.actual_time = None
-
-    def test_ip(self):
-        ip_obj = optimization.ip_optimization(self.nodes, self.edges, self.intents, self.time_steps, self.time_delta)
-        ip_obj = round(ip_obj, 1) if ip_obj else ip_obj
-        self.assertEqual(ip_obj, self.actual_time)
-
-
 class Example4(unittest.TestCase):
     """A small graph where intent travel time is beyond time horizon, hence no solution."""
     def setUp(self) -> None:

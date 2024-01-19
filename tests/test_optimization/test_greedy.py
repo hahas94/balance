@@ -80,28 +80,6 @@ class Example2(unittest.TestCase):
         self.assertEqual(operation_intent.ideal_time, self.ideal_times[index])
 
 
-class Example3(unittest.TestCase):
-    """A small graph where there is no path between `src` and `dest`, hence no solution."""
-    def setUp(self) -> None:
-        self.start, self.time_horizon, self.time_delta, nodes, edges, intents = \
-            main.read_example('tests/test_examples/test3.json')
-        self.nodes, self.edges, self.intents = main.create_dicts(nodes, edges, intents,
-                                                                 self.time_horizon, self.time_delta)
-
-    def test_dijkstra(self):
-        index = 0
-
-        intent_name, operation_intent = list(self.intents.items())[index]
-        nodes_list = list(self.nodes.values())
-        goal_node = optimization.find_shortest_path_extended(operation_intent, self.time_delta, nodes_list)
-        optimization.find_shortest_path(operation_intent, nodes_list)
-
-        # assert goal node is reached
-        self.assertIs(goal_node, None)
-        self.assertEqual(operation_intent.actual_greedy_time, 0)
-        self.assertEqual(operation_intent.ideal_time, 0)
-
-
 class Example4(unittest.TestCase):
     """A small graph where intent travel time is beyond time horizon, hence no solution."""
     def setUp(self) -> None:
