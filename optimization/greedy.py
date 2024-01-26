@@ -5,15 +5,14 @@ This file implements the original Dijkstra's algorithm as well as a specialized 
 It is used to find the shortest paths for operational intents.
 """
 
-from typing import Dict, Sequence, Union
-import copy
+from typing import Dict, Union
 import queue
 
 import graph
 import intent
 
 
-def find_shortest_path(operation_intent: intent.Intent, nodes: Sequence[graph.Node]) -> None:
+def find_shortest_path(operation_intent: intent.Intent, nodes_dict: Dict[str, graph.Node]) -> None:
     """
     Runs the original Dijkstra's algorithm to find the shortest path.
     The graph is built successively.
@@ -21,8 +20,8 @@ def find_shortest_path(operation_intent: intent.Intent, nodes: Sequence[graph.No
     Args:
         operation_intent: intent.Intent
             An operational intent.
-        nodes: Sequence[graph.Node]
-            A list of nodes objects.
+        nodes_dict: Dict[str, graph.Node]
+            Dictionary of all node objects and their names as keys.
 
     Returns:
 
@@ -31,7 +30,7 @@ def find_shortest_path(operation_intent: intent.Intent, nodes: Sequence[graph.No
     destination_node = operation_intent.destination
     ideal_time: Union[float, int] = 0
 
-    distances: Dict[str, Union[float, int]] = {node.name: float('inf') for node in nodes}
+    distances: Dict[str, Union[float, int]] = {node.name: float('inf') for node in nodes_dict.values()}
     distances[source_node.name] = 0
 
     priority_queue: queue.PriorityQueue = queue.PriorityQueue()
@@ -57,46 +56,7 @@ def find_shortest_path(operation_intent: intent.Intent, nodes: Sequence[graph.No
     return None
 
 
-def create_extended_node(name: str, layer: int, previous: graph.ExtendedNode, original: graph.Node,
-                         travel_time: int, insertion_order: int, start: int, stop: int, n_deltas_uncertainty) \
-        -> graph.ExtendedNode:
-    """
-    Helper function that creates and returns an ExtendedNode and modifies some of its variables.
-
-    Args:
-        name: str
-            Original node name.
-        layer: int
-            Layer in extended network.
-        previous: graph.ExtendedNode
-            Node that leads to the current node.
-        original: graph.Node
-            Original node being represented by this node.
-        travel_time: int
-            Time it takes to get to this node from start.
-        insertion_order: int
-            The order this node is put into the queue.
-        start: int
-            Layer from which the drone departs.
-        stop: int
-            Layer (exclusive) at which the drone reaches this node.
-        n_deltas_uncertainty: int
-            Travel time plus time uncertainty converted to time deltas.
-
-    Returns:
-        extended: graph.ExtendedNode
-            The newly created node.
-    """
-    extended = graph.ExtendedNode(name, layer, previous, original, travel_time)
-    extended.insertion_order = insertion_order
-    extended.uncertainty_layer = previous.layer + n_deltas_uncertainty
-    extended.capacities = {key: val.copy() for key, val in previous.capacities.items()}
-    extended.decrement_capacity(name, start, stop)
-
-    return extended
-
-
-def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nodes: Sequence[graph.Node]) \
+def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nodes_dict: Dict[str, graph.Node]) \
         -> Union[None, graph.ExtendedNode]:
     """
     Runs the specialized Dijkstra's algorithm to find the shortest
@@ -107,8 +67,8 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
             An operational intent.
         delta: int
             Time delta
-        nodes: Sequence[graph.Node]
-            A list of nodes objects.
+        nodes_dict: Dict[str, graph.Node]
+            Dictionary of node objects and their names as keys.
 
     Returns:
         destination_extended: Union[None, graph.ExtendedNode]
@@ -125,27 +85,29 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
     layer = k + (r > 0)
     operation_intent.start = delta * layer
 
-    unvisited_queue: queue.PriorityQueue = queue.PriorityQueue()
-
     # create an extended node for the source node and add it to the queue
-    start_node_extended = graph.ExtendedNode(source_node.name, layer, None, source_node, 0)
-    start_node_extended.capacities = {node.name: node.layer_capacities for node in nodes}
-    unvisited_queue.put((start_node_extended.travel_time, start_node_extended))
-
+    source_node_extended = graph.ExtendedNode(source_node.name, layer, None, 0, 0, 0, -1)
     destination_extended: Union[None, graph.ExtendedNode] = None
-    distances: Dict[str, Union[float, int]] = {start_node_extended.name: 0}
+
+    unvisited_queue: queue.PriorityQueue = queue.PriorityQueue()
+    distances: Dict[str, Union[float, int]] = {source_node_extended.name: 0}
+    unvisited_queue.put((source_node_extended.travel_time, source_node_extended))
 
     # this constant can be used to make nodes representing ground delay to be of less priority than other nodes.
+    # this is a temporary hack until it has to be changed into something more robust.
     GROUND_DELAY_PRIORITY_DECREMENTOR = 1e6
 
     while not unvisited_queue.empty():
         current_dist, current_node = unvisited_queue.get()
-        if current_node.original == source_node and current_dist >= GROUND_DELAY_PRIORITY_DECREMENTOR:
+        current_node_original = nodes_dict[current_node.name_original]
+
+        if current_node_original == source_node and current_dist >= GROUND_DELAY_PRIORITY_DECREMENTOR:
             current_dist -= GROUND_DELAY_PRIORITY_DECREMENTOR
-        curr_layer = current_node.layer
+
+        current_layer = current_node.layer
 
         # goal check
-        if current_node.original == destination_node:
+        if current_node_original == destination_node:
             destination_extended = current_node
             break
 
@@ -154,7 +116,7 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
             continue
 
         index = -1  # used for insertion_order
-        for index, edge in enumerate(current_node.original.outgoing_edges):
+        for index, edge in enumerate(current_node_original.outgoing_edges):
             v: graph.Node = edge.destination
             k, r = divmod(edge.weight, delta)
             k1, r1 = divmod(edge.weight + time_uncertainty, delta)
@@ -162,7 +124,7 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
             n_deltas_uncertainty = k1 + (r1 > 0)
             new_weight = n_deltas * delta
             v_travel_time = current_dist + new_weight
-            v_extended_name = v.name + '_' + str(current_node.layer + n_deltas)
+            v_extended_name = f"{v.name}_{current_layer + n_deltas}"
 
             # checking whether this neighbor has been explored previously
             try:
@@ -170,24 +132,27 @@ def find_shortest_path_extended(operation_intent: intent.Intent, delta: int, nod
             except KeyError as _:
                 distances[v_extended_name] = float('inf')
 
-            v_has_capacity = current_node.has_capacity(v.name, curr_layer + 1, curr_layer + n_deltas_uncertainty + 1)
+            v_has_capacity = v.has_capacity(current_layer + 1, current_layer + n_deltas_uncertainty + 1)
             shorter_path_found = v_travel_time < distances[v_extended_name]
 
             if shorter_path_found and v_has_capacity:
                 distances[v_extended_name] = v_travel_time
-                v_extended = create_extended_node(v.name, curr_layer + n_deltas, current_node, v, v_travel_time, index,
-                                                  curr_layer + 1, curr_layer + n_deltas_uncertainty + 1,
-                                                  n_deltas_uncertainty)
+                v_extended = graph.ExtendedNode(name=v.name, layer=current_layer+n_deltas, previous=current_node,
+                                                travel_time=v_travel_time, left_reserve=current_layer+1,
+                                                right_reserve=current_layer+n_deltas_uncertainty,
+                                                insertion_order=index)
+
                 unvisited_queue.put((v_travel_time, v_extended))
 
         # add the node itself to the queue to indicate the drone
         # can stay where it is and wait, if it is the departure node
-        ground_delay_possible = (current_node.original == source_node) and \
-                                (current_node.has_capacity(current_node.original.name, curr_layer + 1, curr_layer + 2))
+        ground_delay_possible = current_node_original == source_node and current_layer+1 < source_node.num_layers
         if ground_delay_possible:
-            current_itself = create_extended_node(current_node.original.name, curr_layer + 1, current_node,
-                                                  current_node.original, current_node.travel_time + delta,
-                                                  index + 1, curr_layer + 1, curr_layer + 2, 1)
+            current_itself = graph.ExtendedNode(name=current_node.name_original, layer=current_layer+1,
+                                                previous=current_node, travel_time=current_node.travel_time+delta,
+                                                left_reserve=current_layer+1, right_reserve=current_layer+1,
+                                                insertion_order=index+1)
+
             distances[current_itself.name] = current_itself.travel_time
             unvisited_queue.put((current_itself.travel_time + GROUND_DELAY_PRIORITY_DECREMENTOR, current_itself))
 
