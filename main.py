@@ -8,12 +8,19 @@ routing problem and save the results.
 To run this file, define the path to an example json file first, then run. Example:
     `example_path = "./examples/example1.json"`
 """
-
+import datetime
+import itertools
 import json
 import math
-from typing import List, Dict, Sequence, Tuple, Union
+import os
 import time
-import datetime
+import tracemalloc
+from typing import List, Dict, Sequence, Tuple, Union
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 import checks
 import graph
@@ -29,7 +36,111 @@ class InvalidSolutionError(Exception):
         self.message = message
 
 
-def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List[Dict]]:
+class DataAnalysis:
+    """Class for storing results related to a run, and plotting them."""
+    __slots__ = ['name', 'dataframe', 'num_rows']
+
+    def __init__(self, name: str):
+        """Creates an instance. `name` is the example name used for file and plots name."""
+        self.name = name
+        self.num_rows = 0
+        self.dataframe: pd.DataFrame = pd.DataFrame(columns=['num_intents', 'greedy_obj', 'ip_obj',
+                                                             'greedy_runtime', 'ip_runtime', 'greedy_memory_usage',
+                                                             'ip_memory_usage', 'intents', 'greedy_path', 'ip_path'])
+
+    def add_row(self, num_intents: int, greedy_obj: Union[int, None],
+                ip_obj: Union[float, None], greedy_runtime: float, ip_runtime: float,
+                greedy_memory_usage: float, ip_memory_usage: float, intents: List[intent.Intent],
+                greedy_path: List[List[utils.Link]], ip_path: List[List[utils.Link]]):
+        """
+        Adds a new row to the dataframe.
+
+        Parameters
+        ----------
+        num_intents: int
+            Number of intents.
+        greedy_obj: Union[int, None]
+            Greedy objective
+        ip_obj: Union[float, None]
+            IP objective
+        greedy_runtime: float
+            Greedy runtime, in seconds.
+        ip_runtime: float
+            IP runtime, in seconds.
+        greedy_memory_usage: float:
+            Greedy memory usage, in bytes.
+        ip_memory_usage: float
+            IP memory usage, in bytes.
+        intents: List[intent.Intent]
+            A list of the intents in the run.
+        greedy_path: List[List[utils.Link]]
+            The path found by greedy method.
+        ip_path: List[List[utils.Link]]
+            The path found by ip method.
+
+        Returns
+        -------
+
+        """
+        # time is stored in minutes
+        greedy_runtime, ip_runtime = round(greedy_runtime/60, 2), round(ip_runtime/60, 2)
+
+        # memory usage is stored in GB
+        greedy_memory_usage, ip_memory_usage = round(greedy_memory_usage/10e9, 2), round(ip_memory_usage/10e9, 2)
+
+        self.dataframe.loc[self.num_rows] = [num_intents, greedy_obj, ip_obj, greedy_runtime,
+                                             ip_runtime, greedy_memory_usage, ip_memory_usage,
+                                             intents, greedy_path, ip_path]
+
+        self.num_rows += 1
+
+    def save(self):
+        """Saves data to local files, both in csv and Markdown format."""
+        if not os.path.exists(f'./results/{self.name}'):
+            os.makedirs(f'./results/{self.name}')
+
+        self.dataframe.to_csv(f'./results/{self.name}/table.csv')
+        self.dataframe.to_markdown(f'./results/{self.name}/markdown.md')
+
+        return
+
+    def plot(self):
+        """Plots the objectives, runtimes and memory usages of both methods side by side."""
+        if not os.path.exists(f'./results/{self.name}'):
+            os.makedirs(f'./results/{self.name}')
+
+        plt.style.use("seaborn-v0_8")
+
+        greedy_color, ip_color = 'mediumaquamarine', 'violet'
+        data = [[self.dataframe.greedy_obj, self.dataframe.ip_obj],
+                [self.dataframe.greedy_runtime, self.dataframe.ip_runtime],
+                [self.dataframe.greedy_memory_usage, self.dataframe.ip_memory_usage]]
+        x_label = 'Number of intents'
+        y_labels = ['Cost', 'Runtime (min)', 'Memory usage (GB)']
+        titles = ['Objectives of the methods', 'Runtimes of the methods', 'Memory usages of the methods']
+        x_axis = self.dataframe.num_intents.values
+        fontsize = 16
+        linewidth = 3
+
+        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(30, 9))
+
+        for indx, elem in enumerate(data):
+            ax[indx].plot(x_axis, elem[0], ls='--', linewidth=linewidth, color=greedy_color, label='Greedy')
+            ax[indx].plot(x_axis, elem[1], ls='--', linewidth=linewidth, color=ip_color, label='IP')
+            # ax[indx].set(xlabel=x_label, ylabel=y_labels[indx], title=titles[indx])
+            ax[indx].set_xlabel(xlabel=x_label, family='serif', fontsize=fontsize)
+            ax[indx].set_ylabel(ylabel=y_labels[indx], family='serif', fontsize=fontsize)
+            ax[indx].set_title(label=titles[indx], family='serif', fontsize=fontsize+4)
+            ax[indx].set_xticks(x_axis)
+            ax[indx].legend()
+
+        fig.savefig(f'./results/{self.name}/plot.png')
+
+        return
+
+
+def read_example(path: str, intents=None) \
+        -> Tuple[int, int, int, Union[int, float], List[Dict], List[Dict], List[Dict]]:
     """
     Opens an example file, reads it and returns its content. Program exits if json data format is invalid.
     It will throw assertion errors if the actual data is of incorrect type or value.
@@ -38,11 +149,13 @@ def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List
     ----------
     path: str
         Path to an example json file. Ex. 'ex1.json'.
+    intents: list (optional)
+        A list of intents is passed for examples where intents are generated randomly.
 
     Returns
     -------
     return value: Tuple[int, int, int, List[Dict], List[Dict], List[Dict]]
-        A tuple (start_time, time_horizon, time_delta, nodes_list, edges_list, intents_list)
+        A tuple (start_time, time_horizon, time_delta, speed, nodes_list, edges_list, intents_list)
 
     """
     with open(path, 'r') as f:
@@ -65,6 +178,9 @@ def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List
             ("Time delta must be a positive integer and a multiple of it equal the time horizon, "
              "i.e. T = k*delta for an integer k.")
 
+        speed = data["speed"]
+        assert speed > 0 and (isinstance(speed, int) or isinstance(speed, float))
+
         nodes = data["nodes"]
         for node in nodes:
             assert isinstance(node['name'], str) and isinstance(node['capacity'], int) and node['capacity'] >= 0, (
@@ -76,7 +192,8 @@ def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List
                    isinstance(edge['weight'], int) and edge['weight'] >= 0, (
                 f"{edge}: Either syntax error in edge names, weight being non integer or negative.")
 
-        intents = data["intents"]
+        if intents is None:
+            intents = data["intents"]
         for op_intent in intents:
             assert isinstance(op_intent['source'], str) and isinstance(op_intent['destination'], str) \
                    and isinstance(op_intent['start'], int) and op_intent['start'] >= start \
@@ -84,11 +201,14 @@ def read_example(path: str) -> Tuple[int, int, int, List[Dict], List[Dict], List
                 f"{op_intent}: Either syntax error in names, start time being non integer, it starts before "
                 f"operations start time or time uncertainty is negative/non-integer.")
 
-        return start, time_horizon, time_delta, nodes, edges, intents
+            op_intent["uncertainty"] = min(op_intent["uncertainty"] * time_delta, time_horizon // 10)
+            op_intent["start"] = min(op_intent["start"] * time_delta, time_horizon // 2)
+
+        return start, time_horizon, time_delta, speed, nodes, edges, intents
 
 
-def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time_horizon: int, time_delta: int) \
-        -> Tuple[Dict, Dict, Dict]:
+def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time_horizon: int, time_delta: int,
+                 speed: Union[int, float]) -> Tuple[Dict, Dict, Dict]:
     """
     Creates dictionaries of intents, nodes, edges given lists of these.
     Parameters
@@ -103,6 +223,8 @@ def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time
         Planning time horizon.
     time_delta: int
         Time delta.
+    speed: Union[int, float]
+        Common speed of all intents.
 
     Returns
     -------
@@ -115,7 +237,8 @@ def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time
     nodes_dict = {v["name"]: graph.Node(v["name"], v["capacity"], num_layers) for v in nodes}
     edges_dict = {
         (e["source"], e["destination"]):
-            graph.Edge(nodes_dict[e["source"]], nodes_dict[e["destination"]], e["weight"]) for e in edges
+            graph.Edge(nodes_dict[e["source"]], nodes_dict[e["destination"]], math.ceil(e["weight"]/speed))
+        for e in edges
     }
     intents_dict = {
         (i["source"], i["destination"], i["start"]):
@@ -126,33 +249,96 @@ def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time
     return nodes_dict, edges_dict, intents_dict
 
 
-def solve_greedy(operational_intent: intent.Intent, time_delta: int,
-                 nodes: Sequence[graph.Node]) -> Tuple[Union[int, None], Union[graph.ExtendedNode, None]]:
+def get_all_intents(path):
+    """
+    Given path to a json data file, this function creates and
+    returns the list of all possible intents in the graph.
+    """
+    with open(path, 'r') as file:
+        content = file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON example file at {path}:", e)
+        exit()
+    else:
+        nodes, edges = data["nodes"], data["edges"]
+        full_graph = nx.DiGraph([(edge["source"], edge["destination"]) for edge in edges])
+        possible_intents = [(s, t) for s, t in itertools.product(nodes, nodes)
+                            if s['name'] != t['name'] and nx.has_path(full_graph, s['name'], t['name'])]
+
+        return possible_intents
+
+
+def create_intent(all_intents: list):
+    """
+    Selects an intent randomly from the list of all intents.
+    Then generates random start time and time uncertainty.
+
+    Parameters
+    ----------
+    all_intents: list
+        A list of all possible intents
+
+    Returns
+    -------
+        intent: dict
+            The generated intent
+    """
+    random_index = np.random.randint(low=0, high=len(all_intents))
+    source, destination = all_intents[random_index]
+    source, destination = source['name'], destination['name']
+    U = np.random.randint(low=0, high=6)
+    start = np.random.randint(low=0, high=20)
+
+    return {"source": source, "destination": destination, "start": start, "uncertainty": U}
+
+
+def solve_greedy(intents_dict: Dict[str, intent.Intent], time_delta: int, nodes_dict: Dict[str, graph.Node]) \
+        -> Tuple[Union[int, None], Union[graph.ExtendedNode, None]]:
     """
     Given data related to an operational intent, it runs the greedy algorithms on that intent,
     and prints the path found for it, if successfull.
 
     Parameters
     ----------
-    operational_intent: intent.Intent
-        An intent object.
+    intents_dict: Dict[str, intent.Intent]
+        Dictionary of intent objects.
     time_delta: int
         Time delta
-    nodes: Sequence[graph.Node]
-        A list of nodes objects.
+    nodes_dict: Dict[str, graph.Node]
+        Dictionary of node objects and their names as keys.
 
     Returns
     -------
-    time_difference: Tuple[Union[int, None]
-        The difference in time between actual and ideal planning times.
-    goal_node: Union[graph.ExtendedNode, None]]
-        An extended node representing the destination node (if reached).
+    greedy_obj: Union[int, None]
+        The objective. If no solution found, then None.
 
     """
-    goal_node = optimization.find_shortest_path_extended(operational_intent, time_delta, nodes)
-    optimization.find_shortest_path(operational_intent, nodes)
+    greedy_obj: Union[int, None] = 0
 
-    return operational_intent.greedy_time_difference, goal_node
+    for intent_name, operation_intent in intents_dict.items():
+        # for each previous drone, get path, update vertiport capacities
+        uncertainty_reservation_handling('increment', intent_name, operation_intent, nodes_dict, intents_dict,
+                                         time_delta)
+
+        # solve intent
+        goal_node = optimization.find_shortest_path_extended(operation_intent, time_delta, nodes_dict)
+        optimization.find_shortest_path(operation_intent, nodes_dict)
+        time_difference = operation_intent.greedy_time_difference
+
+        if goal_node and time_difference is not None:
+            adjust_capacities(goal_node, nodes_dict)
+            greedy_obj += time_difference
+        else:
+            # no solution found, so exit
+            return None
+
+        # for each previous drone, get path, update vertiport capacities
+        uncertainty_reservation_handling('decrement', intent_name, operation_intent, nodes_dict, intents_dict,
+                                         time_delta)
+
+    return greedy_obj
 
 
 def solve_ip(nodes: dict, edges: dict, intents: dict, time_steps: range, time_delta: int) -> Union[float, None]:
@@ -214,8 +400,12 @@ def adjust_capacities(goal_node: graph.ExtendedNode, nodes_dict: Dict[str, graph
     Returns:
         None
     """
-    for node, layer_cap in goal_node.capacities.items():
-        nodes_dict[node].layer_capacities = layer_cap
+    while goal_node:
+        original_name = goal_node.name_original
+        left = goal_node.left_reserve
+        right = goal_node.right_reserve
+        nodes_dict[original_name].decrement_capacity(left, right)
+        goal_node = goal_node.previous
 
 
 def increment_reservations(time_uncertainty: int, prev_intent, nodes_dict: dict,  delta: int,
@@ -248,12 +438,13 @@ def increment_reservations(time_uncertainty: int, prev_intent, nodes_dict: dict,
         prev_name = path[index-1].name
 
         if name != prev_name:
-            previous_layer, start_time = path[index-1].layer, path[index-1].layer*delta
-            new_left_layer = (start_time - decrementor*time_uncertainty + 1) // delta
-            l, r = max(1, new_left_layer), previous_layer+1
+            curr_left = path[index].left_reserved_layer
+            left = math.ceil(decrementor*time_uncertainty/delta)
+            new_left_layer = curr_left - left
+            l, r = max(1, new_left_layer), curr_left
             # if previously set let layer, adjust it
             if prev_intent.path_greedy[index].probably_left_reserved_layer:
-                prev_intent.path_greedy[index].probably_left_reserved_layer += decrementor*time_uncertainty
+                prev_intent.path_greedy[index].probably_left_reserved_layer += left
             else:
                 prev_intent.path_greedy[index].probably_left_reserved_layer = new_left_layer
             nodes_dict[name].layer_capacities[l:r] = [cap-decrementor for cap in nodes_dict[name].layer_capacities[l:r]]
@@ -343,25 +534,22 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
     return None
 
 
-def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int, time_steps: range,
-         verbose: bool = True) -> Tuple[Union[int, None], Union[float, None]]:
+def main(path: str, verbose: bool, intents: List = None, analysis_obj: DataAnalysis = None) \
+        -> Tuple[Union[int, None], Union[float, None]]:
     """
     The main function that solves each operational intent in sequence,
     as well as solving them all at once.
 
     Args:
-        nodes_dict: dict
-            Dictionary of nodes objects and their names.
-        edges_dict: dict
-            Dictionary of edges objects and their names.
-        intents_dict: dict
-            Dictionary of intent objects and their names.
-        time_delta: int
-            Time discretization delta
-        time_steps: range
-            A range object for the discretized time steps.
+        path: str
+            Path to test file.
         verbose: bool
-            Whether to print solutions or not.
+            Whether to print solutions.
+        intents: List (optional)
+            This parameter can be used if intents are created on the fly,
+            instead of being defined in a json example file.
+        analysis_obj: DataAnalysis (optional)
+            Object used to collect runs data.
 
     Returns:
         greedy_obj: int
@@ -370,79 +558,121 @@ def main(nodes_dict: dict, edges_dict: dict, intents_dict: dict, time_delta: int
             The ip optimization objective
 
     """
-    greedy_obj: Union[int, None] = 0
+    ip_obj, greedy_obj = None, None
 
-    start_ip = time.perf_counter()
-    ip_obj = solve_ip(nodes_dict, edges_dict, intents_dict, time_steps, time_delta)
-    end_ip = time.perf_counter()
-    ip_solution_time = str(datetime.timedelta(seconds=round(end_ip-start_ip, 2)))
+    ip_runtime, ip_memory = 0, 0
+    greedy_runtime, greedy_memory = 0, 0
 
-    # in case the ip model is unsolvable for this instance due to short time horizon, quit and rerun with longer time.
-    if ip_obj is None:
-        return greedy_obj, ip_obj
+    time_horizon_extender = 1
+    max_runtime = 15*60  # the maximum time a function is allowed to run on the same instance
 
-    print(f"Integer Programming runtime: {ip_solution_time}")  # remove when finished with debugging solving times
+    global_start, global_time_horizon, global_time_delta, global_speed, global_nodes, global_edges, global_intents = (
+        None, None, None, None, None, None, None)
+    global_nodes_dict, global_edges_dict, global_intents_dict = None, None, None
 
-    start_greedy = time.perf_counter()
-    for intent_name, operation_intent in intents_dict.items():
-        # for each previous drone, get path, update vertiport capacities
-        uncertainty_reservation_handling('increment', intent_name, operation_intent, nodes_dict, intents_dict,
-                                         time_delta)
+    while (ip_obj is None and ip_runtime < max_runtime) or (greedy_obj is None and greedy_runtime < max_runtime):
+        print(f"### {ip_obj} {ip_runtime} {ip_memory} || {greedy_obj} {greedy_runtime} {greedy_memory} ###")
+        (global_start, global_time_horizon, global_time_delta, global_speed, global_nodes, global_edges,
+         global_intents) = read_example(path=path, intents=intents)
 
-        # solve intent
-        time_difference, goal_node = solve_greedy(operation_intent, time_delta, list(nodes_dict.values()))
+        global_time_horizon *= time_horizon_extender
 
-        if goal_node and time_difference is not None:
-            adjust_capacities(goal_node, nodes_dict)
-            greedy_obj += time_difference
-        else:
-            # no solution found, so exit
-            return ip_obj, None
+        global_nodes_dict, global_edges_dict, global_intents_dict = \
+            create_dicts(global_nodes, global_edges, global_intents, global_time_horizon, global_time_delta,
+                         global_speed)
 
-        # for each previous drone, get path, update vertiport capacities
-        uncertainty_reservation_handling('decrement', intent_name, operation_intent, nodes_dict, intents_dict,
-                                         time_delta)
-    end_greedy = time.perf_counter()
-    greedy_solution_time = str(datetime.timedelta(seconds=round(end_greedy-start_greedy, 2)))
+        global_time_steps = range(global_start, global_time_horizon + 1, global_time_delta)
 
-    time_horizon = time_steps[-1]
-    valid_solutions = checks.sanity_check(intents_dict, nodes_dict, edges_dict, time_delta, time_horizon)
+        if ip_obj is None and ip_runtime < max_runtime:
+            ip_start = time.perf_counter()
+            tracemalloc.start()
+
+            ip_obj = solve_ip(global_nodes_dict, global_edges_dict, global_intents_dict, global_time_steps,
+                              global_time_delta)
+
+            ip_end = time.perf_counter()
+            ip_runtime += (ip_end - ip_start)
+            _, ip_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            ip_memory += ip_peak
+
+        if greedy_obj is None and greedy_runtime < max_runtime:
+            greedy_start = time.perf_counter()
+            tracemalloc.start()
+
+            greedy_obj = solve_greedy(global_intents_dict, global_time_delta, global_nodes_dict)
+
+            greedy_end = time.perf_counter()
+            greedy_runtime += (greedy_end - greedy_start)
+            _, greedy_peak = tracemalloc.get_traced_memory()
+            greedy_memory += greedy_peak
+            tracemalloc.stop()
+
+        time_horizon_extender += 1
+
+    valid_solutions = checks.sanity_check(global_intents_dict, global_nodes_dict,
+                                          global_edges_dict, global_time_delta, global_time_horizon)
 
     if not valid_solutions:
         raise InvalidSolutionError("Invalid solutions!")
 
     if verbose:
-        print_solutions(intents_dict)
-    print(f"Integer Programming runtime: {ip_solution_time}\nGreedy runtime: {greedy_solution_time}")
+        print_solutions(global_intents_dict)
 
-    sum_ideal_times = sum(op_intent.ideal_time for op_intent in intents_dict.values())
-    ip_obj -= sum_ideal_times
-    ip_obj = round(ip_obj, 1)
+    sum_ideal_times = sum(op_intent.ideal_time for op_intent in global_intents_dict.values())
+    if ip_obj:
+        ip_obj -= sum_ideal_times
+        ip_obj = round(ip_obj, 1)
+
+    if analysis_obj:
+        analysis_obj.add_row(num_intents=len(global_intents), greedy_obj=greedy_obj,
+                             ip_obj=ip_obj, greedy_runtime=greedy_runtime, ip_runtime=ip_runtime,
+                             greedy_memory_usage=greedy_memory, ip_memory_usage=ip_memory,
+                             intents=list(global_intents_dict.values()),
+                             greedy_path=[op_intent.path_greedy for op_intent in global_intents_dict.values()],
+                             ip_path=[op_intent.path_ip for op_intent in global_intents_dict.values()])
+
+    print(f"\nRuntimes\n--------\nGreedy: {str(datetime.timedelta(seconds=greedy_runtime))}\n"
+          f"IP: {str(datetime.timedelta(seconds=ip_runtime))}\n")
+    print(f"Memory usage (GB)\n-----------------\nGreedy: {round(greedy_memory / 1e9, 2)}\n"
+          f"IP: {round(ip_memory / 1e9, 2)}\n")
+    print(f"Objectives\n----------\nGreedy: {greedy_obj}\nIP: {ip_obj}")
 
     return greedy_obj, ip_obj
 
 
 if __name__ == "__main__":
-    example_path = "./examples/test4.json"
-    ip_objective = None
-    greedy_objective = None
-    time_horizon_extender = 1
+    seed = 2718
+    np.random.seed(seed=seed)
 
-    while ip_objective is None or greedy_objective is None:
-        global_start, global_time_horizon, global_time_delta, global_nodes, global_edges, global_intents = \
-            read_example(path=example_path)
+    graph_path = "./graphs/medium_graph.json"
 
-        global_time_horizon *= time_horizon_extender
+    random_intents = True  # whether to run an example with randomly generated intents
 
-        global_nodes_dict, global_edges_dict, global_intents_dict = \
-            create_dicts(global_nodes, global_edges, global_intents, global_time_horizon, global_time_delta)
+    if random_intents:
+        graph_name = 'medium_graph'  # name of the run, to be used for files saving purposes.
+        num_examples = 30  # number of examples with random intents. each example has 2*n intents.
+        all_possible_intents = get_all_intents(path=graph_path)
+        random_intents_lst = []
+        data_analysis = DataAnalysis(graph_name)
 
-        global_time_steps = range(global_start, global_time_horizon + 1, global_time_delta)
+        for example in range(1, num_examples + 1):
+            n_intents = 2 * example
+            intents_lst = [create_intent(all_possible_intents) for _ in range(n_intents)]
 
-        greedy_objective, ip_objective = main(global_nodes_dict, global_edges_dict, global_intents_dict,
-                                              global_time_delta, global_time_steps)
-        time_horizon_extender += 1
+            print(f"\nExample: {example}")
 
-    print(f"Greedy objective: {greedy_objective}\nInteger programming objective: {ip_objective}")
+            ip_objective, greedy_objective = main(graph_path, False, intents_lst, data_analysis)
+
+            print(f"\n{100 * '-'}")
+            print(f"{100 * '-'}")
+
+        # save all results
+        data_analysis.save()
+        # save a plot of the results
+        data_analysis.plot()
+
+    else:
+        greedy_objective, ip_objective = main(graph_path, True)
 
 # =============================================== END OF FILE ===============================================
