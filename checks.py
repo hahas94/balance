@@ -5,7 +5,6 @@ This file contains functions that can be used to perform sanity checks on soluti
 found by the two methods. This is necessary because a method may produce a solution
 where it is difficult to manually ensure its correctness, and it may be wrong.
 """
-import math
 
 # function to check that times are strictly increasing
 #  to check that time + edge.weight = next_time
@@ -57,7 +56,7 @@ def time_correctness(path: list, edges: dict, time_delta: int) -> bool:
         else:
             try:
                 w = edges[(dep_node, arr_node)].weight
-            except KeyError as e:
+            except KeyError as _:
                 # no such edge exists
                 return False
             k, r = divmod(w, time_delta)
@@ -70,7 +69,7 @@ def time_correctness(path: list, edges: dict, time_delta: int) -> bool:
     return time_correct
 
 
-def capacity_correctness(intents: dict, nodes: dict, edges: dict, time_delta: int, time_horizon: int) -> bool:
+def capacity_correctness(intents: dict, nodes: dict, time_delta: int, time_horizon: int) -> bool:
     """
     Checks whether any vertiport is overcapacitated at any point in the time planning.
 
@@ -80,8 +79,6 @@ def capacity_correctness(intents: dict, nodes: dict, edges: dict, time_delta: in
         The intents dict.
     nodes: dict
         The nodes dict.
-    edges: dict
-        The edges dict.
     time_delta: int
         Time discretization delta.
     time_horizon: int
@@ -95,7 +92,6 @@ def capacity_correctness(intents: dict, nodes: dict, edges: dict, time_delta: in
     """
 
     n_vertiports, n_layers = len(nodes), time_horizon//time_delta
-    n_drones = len(intents)
 
     reservations_greedy = np.zeros((n_vertiports, n_layers+1))
     reservations_ip = np.zeros((n_vertiports, n_layers+1))
@@ -107,17 +103,21 @@ def capacity_correctness(intents: dict, nodes: dict, edges: dict, time_delta: in
             for i in range(len(path[:-1])):
                 dep_link, arr_link = path[i], path[i + 1]
                 dep_node, arr_node = dep_link.name, arr_link.name
-                dep_time, arr_time = dep_link.layer*time_delta, arr_link.layer*time_delta
 
                 left = arr_link.left_reserved_layer
                 right = arr_link.right_reserved_layer
 
+                # no reservation for ground delay
                 if dep_node == arr_node:
                     left = arr_link.layer
-                    right = arr_link.layer
+                    right = arr_link.layer-1
+
                 vertiport_id = int(arr_node[1:])
+
+                # in case left reserved layer is not determined (which can happen for the last intent), set manually
                 if not left and right:
                     left = dep_link.layer + 1
+
                 reservations[vertiport_id][range(left, right+1)] += 1
 
     vertiport_capacities = np.expand_dims(np.array([node.capacity for node in nodes.values()]), 1)
@@ -158,7 +158,7 @@ def sanity_check(intents: dict, nodes: dict, edges: dict, time_delta: int, time_
         ip_correct = time_correctness(intent.path_ip, edges, time_delta)
         time_correct = time_correct and greedy_correct and ip_correct
 
-    capacity_correct = capacity_correctness(intents, nodes, edges, time_delta, time_horizon)
+    capacity_correct = capacity_correctness(intents, nodes, time_delta, time_horizon)
 
     correct = time_correct and capacity_correct
     return correct
