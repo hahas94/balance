@@ -41,7 +41,8 @@ class Intent:
         self._ip_solution_found = False
 
     def __repr__(self):
-        return f"Intent(source={self._source.name}, destination={self._destination.name}, start={self._start})"
+        return (f"Intent(source={self._source.name}, destination={self._destination.name}, "
+                f"start={self._start}, uncertainty={self.time_uncertainty})")
 
     def __str__(self):
         return f"Intent {(self._source.name, self._destination.name)} starts at {self._start}"
@@ -120,8 +121,8 @@ class Intent:
     def build_greedy_path(self, goal_node: Union[None, graph.ExtendedNode]) -> None:
         """Given a goal node, it backtracks on it to create a path from start to destination."""
         while goal_node is not None:
-            link = utils.Link(name=goal_node.original.name, layer=goal_node.layer, travel_time=goal_node.travel_time,
-                              left_reserved_layer=None, right_reserved_layer=goal_node.uncertainty_layer)
+            link = utils.Link(name=goal_node.name_original, layer=goal_node.layer, travel_time=goal_node.travel_time,
+                              left_reserved_layer=goal_node.left_reserve, right_reserved_layer=goal_node.right_reserve)
             self._path_greedy.insert(0, link)
             goal_node = goal_node.previous
         self._greedy_solution_found = True
@@ -161,7 +162,8 @@ class Intent:
             print(f"\tNo solution is possible for this operational intent.")
 
         if self._ip_solution_found:
-            solution_ip = "".join([f"[node:{link.name}, layer:{link.layer}, travel_time:{self._start + link.travel_time}]" +
+            solution_ip = "".join([f"[node:{link.name}, layer:{link.layer}, "
+                                   f"travel_time:{self._start + link.travel_time}]" +
                                    (" --> " if index < len(self._path_ip) - 1 else "")
                                    for index, link in enumerate(self._path_ip)])
             print(f"\t{solution_ip}")
