@@ -3,6 +3,9 @@ File description:
 -----------------
 This file contains functions and/or classes that can be used across the project files.
 """
+import datetime
+import functools
+import time
 
 
 class Link:
@@ -30,6 +33,10 @@ class Link:
         self._left_reserved_layer = left_reserved_layer
         self._right_reserved_layer = right_reserved_layer
         self._probably_left_reserved_layer = None  # left reserved layer during increment/decrement
+
+    def __repr__(self):
+        return (f"name={self.name}, layer={self.layer}, travel_time={self.travel_time}, "
+                f"left_reserved_layer={self.left_reserved_layer}, right_reserved_layer={self.right_reserved_layer}")
 
     def __str__(self):
         return f"{self._name}_{self._layer}"
