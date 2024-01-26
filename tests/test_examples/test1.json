@@ -2,6 +2,7 @@
     "start": 0,
     "time_horizon": 30,
     "time_delta": 10,
+    "speed": 1,
     "nodes": [
         {"name": "v0", "capacity": 2},
         {"name": "v1", "capacity": 2},
