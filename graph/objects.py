@@ -8,12 +8,12 @@ a node object in a time-extended network.
 
 from __future__ import annotations  # Needed for forward declarations
 
-from typing import List, Dict, Union
+from typing import List, Union
 import numpy as np
 
 
 class Node:
-    """Implements a regular node object."""
+    """Implements a regular node object, which represents a vertiport."""
     def __init__(self, name: str, capacity: int, num_layers: int) -> None:
         """
         Creates an instance of a Node object.
@@ -30,10 +30,10 @@ class Node:
         self._capacity = capacity
         self._num_layers = num_layers + 1  # element at index 0 is never used.
         self._outgoing_edges: List[Edge] = []
-        self._layer_capacities: List[int] = [capacity for _ in range(self._num_layers)]
+        self._layer_capacities: np.ndarray[np.intc] = capacity * np.ones(self._num_layers, dtype=np.intc)
 
     def __repr__(self):
-        return f"Node(name={self._name}, capacity={self._capacity})"
+        return f"Node(name={self._name}, capacity={self._capacity}, num_layers={self._num_layers})"
 
     def __str__(self):
         return f"Node {self._name} has capacity {self._capacity}"
@@ -58,15 +58,19 @@ class Node:
         return self._capacity
 
     @property
+    def num_layers(self) -> int:
+        return self._num_layers
+
+    @property
     def outgoing_edges(self) -> List[Edge]:
         return self._outgoing_edges
 
     @property
-    def layer_capacities(self) -> List[int]:
+    def layer_capacities(self) -> np.ndarray[np.intc]:
         return self._layer_capacities
 
     @layer_capacities.setter
-    def layer_capacities(self, capacities: List[int]) -> None:
+    def layer_capacities(self, capacities: np.ndarray[np.intc]) -> None:
         self._layer_capacities = capacities
 
     def add_outgoing_edge(self, o_edge: Edge) -> None:
@@ -83,14 +87,48 @@ class Node:
         if isinstance(o_edge, Edge):
             self._outgoing_edges.append(o_edge)
         else:
-            raise ValueError("Instance must be of type Edge.")
+            raise TypeError("Instance must be of type Edge.")
         return
+
+    def has_capacity(self, start: int, stop: int) -> bool:
+        """
+        Checks whether the node has capacity at all layers between `start` and `stop` layers.
+        If a layer is outside the possible layers, then it is False.
+
+        Args:
+            start: int
+                Start layer.
+            stop: int
+                Stop layer (exclusive)
+
+        Returns:
+            return value: bool
+                Node has necessary capacity (True) or not (False).
+        """
+        if start < 0 or stop > len(self._layer_capacities):
+            return False
+        return np.all(self._layer_capacities[start:stop] > 0)
+
+    def decrement_capacity(self, start: int, stop: int) -> None:
+        """
+        Decrements the capacity of several layers of the node by 1.
+
+        Args:
+            start: int
+                Start layer.
+            stop: int
+                Stop layer
+
+        Returns:
+
+        """
+        self._layer_capacities[start:stop+1] -= 1
 
 
 class ExtendedNode:
-    """Implements an ExtendedNode object."""
-    def __init__(self, name: str, layer: int, previous: Union[ExtendedNode, None], original: Node, travel_time: int) \
-            -> None:
+    """Implements an object which represents a node in a specific layer in the time extended graph."""
+    def __init__(self, name: str, layer: int, previous: Union[ExtendedNode, None], travel_time: int, left_reserve: int,
+                 right_reserve: int, insertion_order: int) -> None:
         """
         Creates an instance of ExtendedNode object.
         Args:
@@ -99,28 +137,34 @@ class ExtendedNode:
             layer: int
                 The layer of the extended network this node exists at.
             previous: Union[ExtendedNode, None]
-                The previous ExtendedNode in the graph from which a drone travelled towards this node.
+                The previous ExtendedNode in the graph leading to this node.
                 If this is the start node, then no previous node can exist hence `None`.
-            original: Node
-                The original node this extended node represents.
             travel_time: int
-                Time it took to reach this node from start.
+                Time it took to reach this node from source node.
+            left_reserve: int
+                The left most layer to reserve in the original node.
+            right_reserve: int
+                The right most layer to reserve in the original node.
+            insertion_order: int
+                The order at which the node is added to a priority queue.
+
         """
         self._name = name + f"_{layer}"  # node name is `original_name`+`Layer`
+        self._name_original = name  # name of the original node this extended node represents.
         self._layer = layer
         self._previous = previous
-        self._original = original
-        self._capacities_dict: Dict[str, List[int]] = {}  # a dictionary of all original node's capacities at `layer`.
         self._travel_time = travel_time
-        self._uncertainty_layer = 0  # the layer at which a drone will reach this node at the latest.
-        self._insertion_order: int = 0  # node will be added to a `queue.PriorityQueue` in an order.
+        self._left_reserve = left_reserve
+        self._right_reserve = right_reserve
+        self._insertion_order = insertion_order
 
     def __repr__(self):
         return (f"ExtendedNode(name={self._name}, layer={self._layer}, previous={self._previous}, " 
-                f"original={self._original}, travel_time={self._travel_time})")
+                f"travel_time={self._travel_time}, left_reserve={self._left_reserve}, "
+                f"right_reserve={self._right_reserve}, insertion_order={self._insertion_order})")
 
     def __str__(self):
-        return f"Extended Node {self._name} at layer {self._layer} has travel time {self._travel_time}"
+        return f"Extended Node {self._name} has travel time {self._travel_time}"
 
     def __lt__(self, other):
         """Comparing two nodes based on their travel time firstly, and then based on their insertion order."""
@@ -133,12 +177,12 @@ class ExtendedNode:
         return self._name
 
     @property
-    def previous(self) -> Union[ExtendedNode, None]:
-        return self._previous
+    def name_original(self) -> str:
+        return self._name_original
 
     @property
-    def original(self) -> Node:
-        return self._original
+    def previous(self) -> Union[ExtendedNode, None]:
+        return self._previous
 
     @property
     def travel_time(self) -> int:
@@ -149,69 +193,16 @@ class ExtendedNode:
         return self._layer
 
     @property
-    def uncertainty_layer(self) -> int:
-        return self._uncertainty_layer
+    def left_reserve(self) -> int:
+        return self._left_reserve
 
-    @uncertainty_layer.setter
-    def uncertainty_layer(self, x: int) -> None:
-        self._uncertainty_layer = x
+    @property
+    def right_reserve(self) -> int:
+        return self._right_reserve
 
     @property
     def insertion_order(self) -> int:
         return self._insertion_order
-
-    @insertion_order.setter
-    def insertion_order(self, x: int) -> None:
-        self._insertion_order = x
-
-    @property
-    def capacities(self) -> Dict[str, List[int]]:
-        return self._capacities_dict
-
-    @capacities.setter
-    def capacities(self, capacities: Dict[str, List[int]]) -> None:
-        self._capacities_dict = capacities
-
-    def has_capacity(self, name: str, start: int, stop: int) -> bool:
-        """
-        Checks whether a node has capacity at all layers between `start` and `stop` layers.
-        If a layer is outside the possible layers, then it is False.
-
-        Args:
-            name: str
-                Original node name.
-            start: int
-                Start layer.
-            stop: int
-                Stop layer (exclusive)
-
-        Returns:
-            return value: bool
-                Node has necessary capacity (True) or not (False).
-        """
-        layers_array = np.array(self._capacities_dict[name])
-        if start < 0 or stop > len(layers_array):
-            return False
-        return np.all(layers_array[start:stop] > 0)
-
-    def decrement_capacity(self, name: str, start: int, stop: int) -> None:
-        """
-        Decrements the capacity of several layers of the original node by 1.
-
-        Args:
-            name: str
-                Original node name.
-            start: int
-                Start layer.
-            stop: int
-                Stop layer (exclusive)
-
-        Returns:
-
-        """
-        layers_array = np.array(self._capacities_dict[name])
-        layers_array[start:stop] -= 1
-        self._capacities_dict[name] = layers_array.tolist()
 
 
 class Edge:
