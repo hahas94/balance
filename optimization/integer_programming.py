@@ -25,6 +25,7 @@ There are a number of constraints to be satisfied:
 
 The objective of the model is to find the shortest total time of operation for all intents.
 """
+
 import math
 from typing import Union
 
@@ -198,7 +199,8 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                        + mip.xsum(vertiport_reserved[v][d][t]
                                   for t in time_steps_ids for d in drones_ids for v in vertiports_ids)/9999999)
     model.verbose = 0
-    model.optimize()
+    max_runtime = 15 * 60
+    model.optimize(max_seconds=max_runtime)
 
     # ---- Output ----
     # checking if a solution was found
