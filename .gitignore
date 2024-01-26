@@ -188,3 +188,4 @@ fabric.properties
 # personal
 docs.txt
 optimization/mip_examples.py
+examples/
