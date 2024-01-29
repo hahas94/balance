@@ -193,18 +193,21 @@ def read_example(path: str, intents=None) \
                 f"{edge}: Either syntax error in edge names, weight being non integer or negative.")
 
         if intents is None:
-            intents = data["intents"]
-        for op_intent in intents:
+            intents_list = data["intents"]
+        else:
+            intents_list = intents
+        for op_intent in intents_list:
             assert isinstance(op_intent['source'], str) and isinstance(op_intent['destination'], str) \
                    and isinstance(op_intent['start'], int) and op_intent['start'] >= start \
                    and isinstance(op_intent['uncertainty'], int) and op_intent['uncertainty'] >= 0, (
                 f"{op_intent}: Either syntax error in names, start time being non integer, it starts before "
                 f"operations start time or time uncertainty is negative/non-integer.")
 
-            op_intent["uncertainty"] = min(op_intent["uncertainty"] * time_delta, time_horizon // 10)
-            op_intent["start"] = min(op_intent["start"] * time_delta, time_horizon // 2)
+            if intents:
+                op_intent["uncertainty"] = min(op_intent["uncertainty"] * time_delta, time_horizon // 10)
+                op_intent["start"] = min(op_intent["start"] * time_delta, time_horizon // 2)
 
-        return start, time_horizon, time_delta, speed, nodes, edges, intents
+        return start, time_horizon, time_delta, speed, nodes, edges, intents_list
 
 
 def create_dicts(nodes: List[Dict], edges: List[Dict], intents: List[Dict], time_horizon: int, time_delta: int,
@@ -645,9 +648,9 @@ if __name__ == "__main__":
     seed = 2718
     np.random.seed(seed=seed)
 
-    graph_path = "./graphs/medium_graph.json"
+    graph_path = "./examples/test14.json"
 
-    random_intents = True  # whether to run an example with randomly generated intents
+    random_intents = False  # whether to run an example with randomly generated intents
 
     if random_intents:
         graph_name = 'medium_graph'  # name of the run, to be used for files saving purposes.
