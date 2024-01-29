@@ -126,7 +126,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     #    the time uncertainties, that is being reserved from start time plus duration and uncertainty.
     for v in vertiports_ids:
         M = len(edges_list)
-        valid_edges = [idx for idx in edges_ids if edges_list[idx][1] == vertiports_list[v]]
+        valid_edges = [idx for idx in edges_ids if edges_list[idx][1] == vertiports_list[v] and idx < len(edges)]
         for d in drones_ids:
             U = intents[drones_list[d]].time_uncertainty
             # edge weights in terms of time delta plus right time uncertainty
