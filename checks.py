@@ -26,7 +26,7 @@ def time_correctness(path: list, edges: dict, time_delta: int) -> bool:
     Parameters
     ----------
     path: list
-        A list of tuples representing a drone path. Each tuple is of the form
+        A list of utils.Link objects representing a drone path. Each tuple is of the form
         (node, arrival_layer, arrival_time, right_most_reserved_layer)
     edges: dict
         The edges dict.
