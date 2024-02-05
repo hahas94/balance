@@ -17,6 +17,7 @@ import time
 import tracemalloc
 from typing import List, Dict, Sequence, Tuple, Union
 
+import mip
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -36,7 +37,7 @@ class InvalidSolutionError(Exception):
         self.message = message
 
 
-class DataAnalysis:
+class ResultsAnalysis:
     """Class for storing results related to a run, and plotting them."""
     __slots__ = ['name', 'dataframe', 'num_rows']
 
@@ -46,12 +47,12 @@ class DataAnalysis:
         self.num_rows = 0
         self.dataframe: pd.DataFrame = pd.DataFrame(columns=['num_intents', 'greedy_obj', 'ip_obj',
                                                              'greedy_runtime', 'ip_runtime', 'greedy_memory_usage',
-                                                             'ip_memory_usage', 'intents', 'greedy_path', 'ip_path'])
+                                                             'ip_memory_usage', 'intents_collection', 'ip_gap'])
 
     def add_row(self, num_intents: int, greedy_obj: Union[int, None],
                 ip_obj: Union[float, None], greedy_runtime: float, ip_runtime: float,
-                greedy_memory_usage: float, ip_memory_usage: float, intents: List[intent.Intent],
-                greedy_path: List[List[utils.Link]], ip_path: List[List[utils.Link]]):
+                greedy_memory_usage: float, ip_memory_usage: float,
+                intents_collection: intent.IntentsCollection, ip_gap: float):
         """
         Adds a new row to the dataframe.
 
@@ -71,12 +72,10 @@ class DataAnalysis:
             Greedy memory usage, in bytes.
         ip_memory_usage: float
             IP memory usage, in bytes.
-        intents: List[intent.Intent]
-            A list of the intents in the run.
-        greedy_path: List[List[utils.Link]]
-            The path found by greedy method.
-        ip_path: List[List[utils.Link]]
-            The path found by ip method.
+        intents_collection: intent.IntentsCollection
+            An object storing the intents in the run.
+        ip_gap: float
+            The model gap of the run.
 
         Returns
         -------
@@ -90,17 +89,16 @@ class DataAnalysis:
 
         self.dataframe.loc[self.num_rows] = [num_intents, greedy_obj, ip_obj, greedy_runtime,
                                              ip_runtime, greedy_memory_usage, ip_memory_usage,
-                                             intents, greedy_path, ip_path]
+                                             intents_collection, ip_gap]
 
         self.num_rows += 1
 
     def save(self):
-        """Saves data to local files, both in csv and Markdown format."""
+        """Pickles dataframe to local files."""
         if not os.path.exists(f'./results/{self.name}'):
             os.makedirs(f'./results/{self.name}')
 
-        self.dataframe.to_csv(f'./results/{self.name}/table.csv')
-        self.dataframe.to_markdown(f'./results/{self.name}/markdown.md')
+        self.dataframe.to_pickle(f'./results/{self.name}/data.pickle')
 
         return
 
@@ -115,26 +113,32 @@ class DataAnalysis:
         data = [[self.dataframe.greedy_obj, self.dataframe.ip_obj],
                 [self.dataframe.greedy_runtime, self.dataframe.ip_runtime],
                 [self.dataframe.greedy_memory_usage, self.dataframe.ip_memory_usage]]
+
         x_label = 'Number of intents'
         y_labels = ['Cost', 'Runtime (min)', 'Memory usage (GB)']
         titles = ['Objectives of the methods', 'Runtimes of the methods', 'Memory usages of the methods']
+        plot_names = ['objective', 'runtime', 'memory_usage']
         x_axis = self.dataframe.num_intents.values
         fontsize = 16
         linewidth = 3
 
-        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(30, 9))
-
         for indx, elem in enumerate(data):
-            ax[indx].plot(x_axis, elem[0], ls='--', linewidth=linewidth, color=greedy_color, label='Greedy')
-            ax[indx].plot(x_axis, elem[1], ls='--', linewidth=linewidth, color=ip_color, label='IP')
-            # ax[indx].set(xlabel=x_label, ylabel=y_labels[indx], title=titles[indx])
-            ax[indx].set_xlabel(xlabel=x_label, family='serif', fontsize=fontsize)
-            ax[indx].set_ylabel(ylabel=y_labels[indx], family='serif', fontsize=fontsize)
-            ax[indx].set_title(label=titles[indx], family='serif', fontsize=fontsize+4)
-            ax[indx].set_xticks(x_axis)
-            ax[indx].legend()
+            mask0, mask1 = np.isfinite(elem[0]), np.isfinite(elem[1])
+            fig, ax = plt.subplots(1, 1)
+            ax.plot(x_axis[mask0], elem[0][mask0], marker='o', ls='-',
+                    linewidth=linewidth, color=greedy_color, label='Greedy')
 
-        fig.savefig(f'./results/{self.name}/plot.png')
+            ax.plot(x_axis[mask1], elem[1][mask1], marker='o', ls='-',
+                    linewidth=linewidth, color=ip_color, label='IP')
+
+            ax.set_xlabel(x_label, family='serif', fontsize=fontsize)
+            ax.set_ylabel(y_labels[indx], family='serif', fontsize=fontsize)
+            ax.set_title(titles[indx], family='serif', fontsize=fontsize)
+            ax.set_xticks(x_axis)
+
+            ax.legend()
+
+            fig.savefig(f'./results/{self.name}/{plot_names[indx]}.png')
 
         return
 
@@ -365,10 +369,12 @@ def solve_ip(nodes: dict, edges: dict, intents: dict, time_steps: range, time_de
     -------
     ip_obj: Union[float, None]
         The objective of the model or none if no solution was found.
+    model: mip.Model
+        The optimization model.
 
     """
-    ip_obj = optimization.ip_optimization(nodes, edges, intents, time_steps, time_delta)
-    return ip_obj
+    ip_obj, model = optimization.ip_optimization(nodes, edges, intents, time_steps, time_delta)
+    return ip_obj, model
 
 
 def print_solutions(intents: dict) -> None:
@@ -537,7 +543,7 @@ def uncertainty_reservation_handling(res_type: str, curr_intent_name: str, curr_
     return None
 
 
-def main(path: str, verbose: bool, intents: List = None, analysis_obj: DataAnalysis = None) \
+def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAnalysis = None) \
         -> Tuple[Union[int, None], Union[float, None]]:
     """
     The main function that solves each operational intent in sequence,
@@ -562,6 +568,7 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: DataAnaly
 
     """
     ip_obj, greedy_obj = None, None
+    ip_model = None
 
     ip_runtime, ip_memory = 0, 0
     greedy_runtime, greedy_memory = 0, 0
@@ -574,7 +581,6 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: DataAnaly
     global_nodes_dict, global_edges_dict, global_intents_dict = None, None, None
 
     while (ip_obj is None and ip_runtime < max_runtime) or (greedy_obj is None and greedy_runtime < max_runtime):
-        print(f"### {ip_obj} {ip_runtime} {ip_memory} || {greedy_obj} {greedy_runtime} {greedy_memory} ###")
         (global_start, global_time_horizon, global_time_delta, global_speed, global_nodes, global_edges,
          global_intents) = read_example(path=path, intents=intents)
 
@@ -590,8 +596,8 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: DataAnaly
             ip_start = time.perf_counter()
             tracemalloc.start()
 
-            ip_obj = solve_ip(global_nodes_dict, global_edges_dict, global_intents_dict, global_time_steps,
-                              global_time_delta)
+            ip_obj, ip_model = solve_ip(global_nodes_dict, global_edges_dict, global_intents_dict, global_time_steps,
+                                        global_time_delta)
 
             ip_end = time.perf_counter()
             ip_runtime += (ip_end - ip_start)
@@ -628,12 +634,12 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: DataAnaly
         ip_obj = round(ip_obj, 1)
 
     if analysis_obj:
+        greedy_obj, ip_obj = greedy_obj if greedy_obj else np.nan, ip_obj if ip_obj else np.nan
         analysis_obj.add_row(num_intents=len(global_intents), greedy_obj=greedy_obj,
                              ip_obj=ip_obj, greedy_runtime=greedy_runtime, ip_runtime=ip_runtime,
                              greedy_memory_usage=greedy_memory, ip_memory_usage=ip_memory,
-                             intents=list(global_intents_dict.values()),
-                             greedy_path=[op_intent.path_greedy for op_intent in global_intents_dict.values()],
-                             ip_path=[op_intent.path_ip for op_intent in global_intents_dict.values()])
+                             intents_collection=intent.IntentsCollection(list(global_intents_dict.values())),
+                             ip_gap=round(ip_model.gap, 3))
 
     print(f"\nRuntimes\n--------\nGreedy: {str(datetime.timedelta(seconds=greedy_runtime))}\n"
           f"IP: {str(datetime.timedelta(seconds=ip_runtime))}\n")
@@ -648,16 +654,17 @@ if __name__ == "__main__":
     seed = 2718
     np.random.seed(seed=seed)
 
-    graph_path = "./examples/test14.json"
+    graph_path = "./graphs/medium_graph.json"
 
-    random_intents = False  # whether to run an example with randomly generated intents
+    random_intents = True  # whether to run an example with randomly generated intents
 
     if random_intents:
         graph_name = 'medium_graph'  # name of the run, to be used for files saving purposes.
-        num_examples = 30  # number of examples with random intents. each example has 2*n intents.
+
+        num_examples = 2  # number of examples with random intents. each example has 2*n intents.
         all_possible_intents = get_all_intents(path=graph_path)
         random_intents_lst = []
-        data_analysis = DataAnalysis(graph_name)
+        data_analysis = ResultsAnalysis(graph_name)
 
         for example in range(1, num_examples + 1):
             n_intents = 2 * example
@@ -668,7 +675,7 @@ if __name__ == "__main__":
             ip_objective, greedy_objective = main(graph_path, False, intents_lst, data_analysis)
 
             print(f"\n{100 * '-'}")
-            print(f"{100 * '-'}")
+            print(f"{100 * '-'}\n")
 
         # save all results
         data_analysis.save()
