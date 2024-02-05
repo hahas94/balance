@@ -24,6 +24,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import checks
+import constants
 import graph
 import intent
 import optimization
@@ -574,13 +575,13 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAn
     greedy_runtime, greedy_memory = 0, 0
 
     time_horizon_extender = 1
-    max_runtime = 15*60  # the maximum time a function is allowed to run on the same instance
 
     global_start, global_time_horizon, global_time_delta, global_speed, global_nodes, global_edges, global_intents = (
         None, None, None, None, None, None, None)
     global_nodes_dict, global_edges_dict, global_intents_dict = None, None, None
 
-    while (ip_obj is None and ip_runtime < max_runtime) or (greedy_obj is None and greedy_runtime < max_runtime):
+    while ((ip_obj is None and ip_runtime < constants.MAXIMUM_RUNTIME) or
+           (greedy_obj is None and greedy_runtime < constants.MAXIMUM_RUNTIME)):
         (global_start, global_time_horizon, global_time_delta, global_speed, global_nodes, global_edges,
          global_intents) = read_example(path=path, intents=intents)
 
@@ -592,7 +593,7 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAn
 
         global_time_steps = range(global_start, global_time_horizon + 1, global_time_delta)
 
-        if ip_obj is None and ip_runtime < max_runtime:
+        if ip_obj is None and ip_runtime < constants.MAXIMUM_RUNTIME:
             ip_start = time.perf_counter()
             tracemalloc.start()
 
@@ -605,7 +606,7 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAn
             tracemalloc.stop()
             ip_memory += ip_peak
 
-        if greedy_obj is None and greedy_runtime < max_runtime:
+        if greedy_obj is None and greedy_runtime < constants.MAXIMUM_RUNTIME:
             greedy_start = time.perf_counter()
             tracemalloc.start()
 
@@ -659,28 +660,38 @@ if __name__ == "__main__":
     random_intents = True  # whether to run an example with randomly generated intents
 
     if random_intents:
+        random_runs_start_time = time.perf_counter()
+        current_time = time.perf_counter()
+
         graph_name = 'medium_graph'  # name of the run, to be used for files saving purposes.
 
-        num_examples = 2  # number of examples with random intents. each example has 2*n intents.
+        intents_incrementor = 10  # each time a new example is created, this number more intents are added to it.
+        example_number = 1  # counter for the number of examples solved.
+        n_intents = intents_incrementor * example_number
+
         all_possible_intents = get_all_intents(path=graph_path)
         random_intents_lst = []
-        data_analysis = ResultsAnalysis(graph_name)
+        results_collector = ResultsAnalysis(graph_name)
 
-        for example in range(1, num_examples + 1):
-            n_intents = 2 * example
+        while (current_time-random_runs_start_time < constants.MAXIMUM_RUNTIME and
+               n_intents <= len(all_possible_intents)):
+
             intents_lst = [create_intent(all_possible_intents) for _ in range(n_intents)]
 
-            print(f"\nExample: {example}")
+            print(f"\nExample: {example_number}")
 
-            ip_objective, greedy_objective = main(graph_path, False, intents_lst, data_analysis)
+            ip_objective, greedy_objective = main(graph_path, False, intents_lst, results_collector)
 
             print(f"\n{100 * '-'}")
             print(f"{100 * '-'}\n")
 
-        # save all results
-        data_analysis.save()
-        # save a plot of the results
-        data_analysis.plot()
+            current_time = time.perf_counter()
+            example_number += 1
+            n_intents = intents_incrementor * example_number
+
+        # storing results
+        results_collector.save()
+        results_collector.plot()
 
     else:
         greedy_objective, ip_objective = main(graph_path, True)
