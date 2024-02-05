@@ -31,6 +31,7 @@ from typing import Union, Callable
 
 import mip
 
+import constants
 import utils
 
 
@@ -208,8 +209,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                        + mip.xsum(vertiport_reserved[v][d][t]
                                   for t in time_steps_ids for d in drones_ids for v in vertiports_ids) / 9999999)
     # model.verbose = 0
-    max_runtime = 15 * 60
-    model.optimize(max_seconds=max_runtime)
+    model.optimize(max_seconds=constants.MAXIMUM_RUNTIME)
 
     # ---- Output ----
     if model.num_solutions:
