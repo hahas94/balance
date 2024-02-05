@@ -176,4 +176,24 @@ class Intent:
               f"greedy time difference:{self.greedy_time_difference}, "
               f"ip time difference:{self.ip_time_difference}\n\n")
 
+
+class IntentsCollection:
+    """A class representing a collection of intents. It is useful for storing a list of intents in pandas dataframe."""
+    __slots__ = ['intents_list']
+
+    def __init__(self, intents_list: List[Intent]):
+        """
+        Initialize an instance.
+        Parameters
+        ----------
+        intents_list: List[Intent]
+            A list of intent instances.
+        """
+        self.intents_list = intents_list
+
+    def __repr__(self):
+        return f"IntentsCollection(intents_list={self.intents_list})"
+
+    def __str__(self):
+        return f"IntentsCollection(length={len(self.intents_list)})"
 # =============================================== END OF FILE ===============================================
