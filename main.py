@@ -664,16 +664,14 @@ if __name__ == "__main__":
     seed = 2718
     np.random.seed(seed=seed)
 
-    graph_path = "./graphs/stockholm_large.json"
-
     # --- whether to run an example with randomly generated intents ---
     random_intents = True
+    graph_name = 'stockholm_medium'  # assuming a graph with this name exists.
+    graph_path = f"./graphs/{graph_name}.json"
 
     if random_intents:
         random_runs_start_time = time.perf_counter()
         current_time = time.perf_counter()
-
-        graph_name = 'stockholm_large'  # name of the run, to be used for files saving purposes.
 
         intents_incrementor = 10  # each time a new example is created, this number more intents are added to it.
         example_number = 1  # counter for the number of examples solved.
