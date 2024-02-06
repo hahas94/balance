@@ -17,6 +17,25 @@ where it is difficult to manually ensure its correctness, and it may be wrong.
 import numpy as np
 
 
+class ValidSolution:
+    """An object that represents whether a method has a valid solution."""
+    __slots_ = ['method', 'time_correct', 'capacity_correct']
+
+    def __init__(self, method, time_correct, capacity_correct):
+        self.method = method
+        self.time_correct = time_correct
+        self.capacity_correct = capacity_correct
+
+    def __repr__(self):
+        return (f'ValidSolution(method={self.method}, time_correct={self.time_correct}, '
+                f'capacity_correct={self.capacity_correct})')
+
+    def __str__(self):
+        tc = 'correct' if self.time_correct else 'not correct'
+        cc = 'correct' if self.capacity_correct else 'not correct'
+        return f"Method {self.method}: time={tc}, capacity={cc} "
+
+
 def time_correctness(path: list, edges: dict, time_delta: int) -> bool:
     """
     Performs checks to ensure that the departing and arriving times are correct,
@@ -86,8 +105,10 @@ def capacity_correctness(intents: dict, nodes: dict, time_delta: int, time_horiz
 
     Returns
     -------
-        capacity_correct: bool
-            Boolean, whether capacities are valid.
+        greedy_capacity_correct: bool
+            Boolean, whether capacities for greedy are valid.
+        ip_capacity_correct: bool
+            Boolean, whether capacities for ip are valid.
 
     """
 
@@ -121,10 +142,10 @@ def capacity_correctness(intents: dict, nodes: dict, time_delta: int, time_horiz
                 reservations[vertiport_id][range(left, right+1)] += 1
 
     vertiport_capacities = np.expand_dims(np.array([node.capacity for node in nodes.values()]), 1)
-    capacity_correct = (np.all(vertiport_capacities - reservations_greedy >= 0)
-                        and np.all(vertiport_capacities - reservations_ip >= 0))
+    greedy_capacity_correct = np.all(vertiport_capacities - reservations_greedy >= 0)
+    ip_capacity_correct = np.all(vertiport_capacities - reservations_ip >= 0)
 
-    return capacity_correct
+    return greedy_capacity_correct, ip_capacity_correct
 
 
 def sanity_check(intents: dict, nodes: dict, edges: dict, time_delta: int, time_horizon: int) -> bool:
@@ -148,20 +169,27 @@ def sanity_check(intents: dict, nodes: dict, edges: dict, time_delta: int, time_
 
     Returns
     -------
-        correct: bool
-            Boolean, whether checks are correct or not.
+        greedy_vs: ValidSolution
+            An instance of ValidSolution.
+        ip_vs: ValidSolution
+           An instance of ValidSolution.
 
     """
-    time_correct = True
+    greedy_time_correct = True
+    ip_time_correct = True
     for intent in intents.values():
         greedy_correct = time_correctness(intent.path_greedy, edges, time_delta)
         ip_correct = time_correctness(intent.path_ip, edges, time_delta)
-        time_correct = time_correct and greedy_correct and ip_correct
+        greedy_time_correct = greedy_time_correct and greedy_correct
+        ip_time_correct = ip_time_correct and ip_correct
 
-    capacity_correct = capacity_correctness(intents, nodes, time_delta, time_horizon)
+    greedy_capacity_correct, ip_capacity_correct = capacity_correctness(intents, nodes, time_delta, time_horizon)
 
-    correct = time_correct and capacity_correct
-    return correct
+    greedy_vs = ValidSolution(method='Greedy', time_correct=greedy_time_correct,
+                              capacity_correct=greedy_capacity_correct)
+    ip_vs = ValidSolution(method='IP', time_correct=ip_time_correct, capacity_correct=ip_capacity_correct)
+
+    return greedy_vs, ip_vs
 
 
 # =============================================== END OF FILE ===============================================
