@@ -1,0 +1,189 @@
+{
+    "start": 0,
+    "time_horizon": 21600,
+    "time_delta": 60,
+    "speed": 15,
+    "nodes": [
+        {"name": "v0", "capacity": 4},
+        {"name": "v1", "capacity": 22},
+        {"name": "v2", "capacity": 1},
+        {"name": "v3", "capacity": 4},
+        {"name": "v4", "capacity": 5},
+        {"name": "v5", "capacity": 4},
+        {"name": "v6", "capacity": 2},
+        {"name": "v7", "capacity": 1},
+        {"name": "v8", "capacity": 1},
+        {"name": "v9", "capacity": 1},
+        {"name": "v10", "capacity": 1}
+    ],
+    "edges": [
+        {
+            "source": "v0",
+            "destination": "v1",
+            "weight": 156
+        },
+        {
+            "source": "v0",
+            "destination": "v2",
+            "weight": 547
+        },
+        {
+            "source": "v0",
+            "destination": "v3",
+            "weight": 584
+        },
+        {
+            "source": "v0",
+            "destination": "v8",
+            "weight": 1782
+        },
+        {
+            "source": "v0",
+            "destination": "v9",
+            "weight": 2373
+        },
+        {
+            "source": "v1",
+            "destination": "v3",
+            "weight": 437
+        },
+        {
+            "source": "v1",
+            "destination": "v2",
+            "weight": 407
+        },
+        {
+            "source": "v1",
+            "destination": "v8",
+            "weight": 1697
+        },
+        {
+            "source": "v1",
+            "destination": "v9",
+            "weight": 2235
+        },
+        {
+            "source": "v1",
+            "destination": "v10",
+            "weight": 2465
+        },
+        {
+            "source": "v2",
+            "destination": "v3",
+            "weight": 64
+        },
+        {
+            "source": "v2",
+            "destination": "v6",
+            "weight": 1935
+        },
+        {
+            "source": "v2",
+            "destination": "v8",
+            "weight": 1354
+        },
+        {
+            "source": "v2",
+            "destination": "v9",
+            "weight": 1828
+        },
+        {
+            "source": "v2",
+            "destination": "v10",
+            "weight": 2067
+        },
+        {
+            "source": "v3",
+            "destination": "v6",
+            "weight": 1963
+        },
+        {
+            "source": "v3",
+            "destination": "v8",
+            "weight": 1369
+        },
+        {
+            "source": "v3",
+            "destination": "v9",
+            "weight": 1801
+        },
+        {
+            "source": "v3",
+            "destination": "v10",
+            "weight": 2029
+        },
+        {
+            "source": "v4",
+            "destination": "v5",
+            "weight": 138
+        },
+        {
+            "source": "v4",
+            "destination": "v6",
+            "weight": 1143
+        },
+        {
+            "source": "v4",
+            "destination": "v7",
+            "weight": 113
+        },
+        {
+            "source": "v4",
+            "destination": "v8",
+            "weight": 1626
+        },
+        {
+            "source": "v5",
+            "destination": "v6",
+            "weight": 1007
+        },
+        {
+            "source": "v5",
+            "destination": "v7",
+            "weight": 60
+        },
+        {
+            "source": "v5",
+            "destination": "v8",
+            "weight": 1506
+        },
+        {
+            "source": "v6",
+            "destination": "v7",
+            "weight": 1037
+        },
+        {
+            "source": "v6",
+            "destination": "v9",
+            "weight": 1663
+        },
+        {
+            "source": "v6",
+            "destination": "v10",
+            "weight": 2108
+        },
+        {
+            "source": "v7",
+            "destination": "v8",
+            "weight": 1514
+        },
+        {
+            "source": "v8",
+            "destination": "v9",
+            "weight": 1152
+        },
+        {
+            "source": "v8",
+            "destination": "v10",
+            "weight": 1586
+        },
+        {
+            "source": "v9",
+            "destination": "v10",
+            "weight": 447
+        }
+    ],
+    "intents": [
+
+    ]
+}
