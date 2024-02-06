@@ -706,8 +706,9 @@ if __name__ == "__main__":
         # --- storing results ---
         results_collector.save()
         results_collector.plot()
-        for idx, modl in enumerate(global_models_list, start=1):
-            modl.write(f'./results/{graph_name}/models/{idx*intents_incrementor}_intents_model.mps')
+        # Unable to save models due to huge model sizes.
+        # for idx, modl in enumerate(global_models_list, start=1):
+        #     modl.write(f'./results/{graph_name}/models/{idx*intents_incrementor}_intents_model.mps')
 
     else:
         greedy_objective, ip_objective = main(graph_path, True)
