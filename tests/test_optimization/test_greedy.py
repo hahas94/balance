@@ -51,8 +51,10 @@ def run_test(self):
         index += 1
 
     # assert solution is valid
-    valid_solutions = checks.sanity_check(self.intents, self.nodes, self.edges, self.time_delta, self.time_horizon)
-    self.assertTrue(valid_solutions)
+    greedy_valid_solution, _ = (
+        checks.sanity_check(self.intents, self.nodes, self.edges, self.time_delta, self.time_horizon))
+    self.assertTrue(greedy_valid_solution.time_correct)
+    self.assertTrue(greedy_valid_solution.capacity_correct)
 
 
 class Example1(unittest.TestCase):

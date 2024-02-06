@@ -23,13 +23,15 @@ def setUp(path):
 
 
 def run_test(self):
-    ip_obj = optimization.ip_optimization(self.nodes, self.edges, self.intents, self.time_steps, self.time_delta)
+    ip_obj, _ = optimization.ip_optimization(self.nodes, self.edges, self.intents, self.time_steps, self.time_delta)
     ip_obj = round(ip_obj, 1) if ip_obj else ip_obj
     self.assertEqual(ip_obj, self.actual_time)
     # assert solution is valid
     if ip_obj:
-        valid_solutions = checks.sanity_check(self.intents, self.nodes, self.edges, self.time_delta, self.time_horizon)
-        self.assertTrue(valid_solutions)
+        _, ip_valid_solution = (
+            checks.sanity_check(self.intents, self.nodes, self.edges, self.time_delta, self.time_horizon))
+        self.assertTrue(ip_valid_solution.time_correct)
+        self.assertTrue(ip_valid_solution.capacity_correct)
 
 
 class Example1(unittest.TestCase):
