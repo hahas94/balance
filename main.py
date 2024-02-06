@@ -17,11 +17,12 @@ import time
 import tracemalloc
 from typing import List, Dict, Sequence, Tuple, Union
 
+import matplotlib.pyplot as plt
 import mip
 import networkx as nx
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import tqdm
 
 import checks
 import constants
@@ -46,14 +47,15 @@ class ResultsAnalysis:
         """Creates an instance. `name` is the example name used for file and plots name."""
         self.name = name
         self.num_rows = 0
-        self.dataframe: pd.DataFrame = pd.DataFrame(columns=['num_intents', 'greedy_obj', 'ip_obj',
-                                                             'greedy_runtime', 'ip_runtime', 'greedy_memory_usage',
-                                                             'ip_memory_usage', 'intents_collection', 'ip_gap'])
+        columns = ['num_intents', 'greedy_obj', 'ip_obj', 'greedy_runtime', 'ip_runtime', 'greedy_memory_usage',
+                   'ip_memory_usage', 'intents_collection', 'ip_gap', 'greedy_solution_valid', 'ip_solution_valid']
+        self.dataframe: pd.DataFrame = pd.DataFrame(columns=columns)
 
     def add_row(self, num_intents: int, greedy_obj: Union[int, None],
                 ip_obj: Union[float, None], greedy_runtime: float, ip_runtime: float,
                 greedy_memory_usage: float, ip_memory_usage: float,
-                intents_collection: intent.IntentsCollection, ip_gap: float):
+                intents_collection: intent.IntentsCollection, ip_gap: float,
+                greedy_solution_valid: bool, ip_solution_valid: bool):
         """
         Adds a new row to the dataframe.
 
@@ -77,6 +79,10 @@ class ResultsAnalysis:
             An object storing the intents in the run.
         ip_gap: float
             The model gap of the run.
+        greedy_solution_valid: bool
+            Whether the solution found by greedy passed the sanity checks.
+        ip_solution_valid: bool
+            Whether the solution found by ip passed the sanity checks.
 
         Returns
         -------
@@ -90,7 +96,8 @@ class ResultsAnalysis:
 
         self.dataframe.loc[self.num_rows] = [num_intents, greedy_obj, ip_obj, greedy_runtime,
                                              ip_runtime, greedy_memory_usage, ip_memory_usage,
-                                             intents_collection, ip_gap]
+                                             intents_collection, ip_gap, greedy_solution_valid,
+                                             ip_solution_valid]
 
         self.num_rows += 1
 
@@ -98,6 +105,7 @@ class ResultsAnalysis:
         """Pickles dataframe to local files."""
         if not os.path.exists(f'./results/{self.name}'):
             os.makedirs(f'./results/{self.name}')
+            os.makedirs(f'./results/{self.name}/models')
 
         self.dataframe.to_pickle(f'./results/{self.name}/data.pickle')
 
@@ -569,7 +577,7 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAn
 
     """
     ip_obj, greedy_obj = None, None
-    ip_model = None
+    ip_model: mip.Model = None
 
     ip_runtime, ip_memory = 0, 0
     greedy_runtime, greedy_memory = 0, 0
@@ -620,11 +628,9 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAn
 
         time_horizon_extender += 1
 
-    valid_solutions = checks.sanity_check(global_intents_dict, global_nodes_dict,
-                                          global_edges_dict, global_time_delta, global_time_horizon)
-
-    if not valid_solutions:
-        raise InvalidSolutionError("Invalid solutions!")
+    greedy_valid_solution, ip_valid_solution = (
+        checks.sanity_check(global_intents_dict, global_nodes_dict, global_edges_dict,
+                            global_time_delta, global_time_horizon))
 
     if verbose:
         print_solutions(global_intents_dict)
@@ -640,7 +646,10 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAn
                              ip_obj=ip_obj, greedy_runtime=greedy_runtime, ip_runtime=ip_runtime,
                              greedy_memory_usage=greedy_memory, ip_memory_usage=ip_memory,
                              intents_collection=intent.IntentsCollection(list(global_intents_dict.values())),
-                             ip_gap=round(ip_model.gap, 3))
+                             ip_gap=round(ip_model.gap, 3), greedy_solution_valid=greedy_valid_solution,
+                             ip_solution_valid=ip_valid_solution)
+
+    global_models_list.append(ip_model)
 
     print(f"\nRuntimes\n--------\nGreedy: {str(datetime.timedelta(seconds=greedy_runtime))}\n"
           f"IP: {str(datetime.timedelta(seconds=ip_runtime))}\n")
@@ -655,15 +664,16 @@ if __name__ == "__main__":
     seed = 2718
     np.random.seed(seed=seed)
 
-    graph_path = "./graphs/medium_graph.json"
+    graph_path = "./graphs/stockholm_large.json"
 
-    random_intents = True  # whether to run an example with randomly generated intents
+    # --- whether to run an example with randomly generated intents ---
+    random_intents = True
 
     if random_intents:
         random_runs_start_time = time.perf_counter()
         current_time = time.perf_counter()
 
-        graph_name = 'medium_graph'  # name of the run, to be used for files saving purposes.
+        graph_name = 'stockholm_large'  # name of the run, to be used for files saving purposes.
 
         intents_incrementor = 10  # each time a new example is created, this number more intents are added to it.
         example_number = 1  # counter for the number of examples solved.
@@ -673,8 +683,9 @@ if __name__ == "__main__":
         random_intents_lst = []
         results_collector = ResultsAnalysis(graph_name)
 
-        while (current_time-random_runs_start_time < constants.MAXIMUM_RUNTIME and
-               n_intents <= len(all_possible_intents)):
+        global_models_list = []
+
+        for _ in tqdm.tqdm(range(1, 1_000_001)):
 
             intents_lst = [create_intent(all_possible_intents) for _ in range(n_intents)]
 
@@ -689,9 +700,14 @@ if __name__ == "__main__":
             example_number += 1
             n_intents = intents_incrementor * example_number
 
-        # storing results
+            if current_time-random_runs_start_time >= constants.MAXIMUM_RUNTIME:
+                break
+
+        # --- storing results ---
         results_collector.save()
         results_collector.plot()
+        for idx, modl in enumerate(global_models_list, start=1):
+            modl.write(f'./results/{graph_name}/models/{idx*intents_incrementor}_intents_model.mps')
 
     else:
         greedy_objective, ip_objective = main(graph_path, True)
