@@ -208,8 +208,15 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                                 for e in edges_ids for d in drones_ids for t in time_steps_ids)
                        + mip.xsum(vertiport_reserved[v][d][t]
                                   for t in time_steps_ids for d in drones_ids for v in vertiports_ids) / 9999999)
-    # model.verbose = 0
-    model.optimize(max_seconds=constants.MAXIMUM_RUNTIME)
+
+    # solving time in minutes. this is increased until a desired gap is reached or global solving time has passed
+    local_runtime = 15
+
+    model.optimize(max_seconds=local_runtime*60)
+
+    while model.gap > constants.ALLOWED_GAP and local_runtime*60 < constants.MAXIMUM_RUNTIME:
+        local_runtime += local_runtime
+        model.optimize(max_seconds=local_runtime * 60)
 
     # ---- Output ----
     if model.num_solutions:
