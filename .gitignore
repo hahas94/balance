@@ -192,9 +192,5 @@ fabric.properties
 docs.txt
 optimization/mip_examples.py
 examples/
-results/*/logs.log
-results/*/runtime.png
-results/*/memory_usage.png
-results/*/data.pkl
-results/*/models
+results/medium_graph
 
