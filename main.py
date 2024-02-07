@@ -687,12 +687,9 @@ if __name__ == "__main__":
 
             intents_lst = [create_intent(all_possible_intents) for _ in range(n_intents)]
 
-            print(f"\nExample: {example_number}")
+            print(f"\nExample: {example_number}\n{'=' * 100}")
 
             ip_objective, greedy_objective = main(graph_path, False, intents_lst, results_collector)
-
-            print(f"\n{100 * '-'}")
-            print(f"{100 * '-'}\n")
 
             current_time = time.perf_counter()
             example_number += 1
