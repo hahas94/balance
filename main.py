@@ -116,7 +116,7 @@ class ResultsAnalysis:
         if not os.path.exists(f'./results/{self.name}'):
             os.makedirs(f'./results/{self.name}')
 
-        plt.style.use("seaborn-v0_8")
+        plt.style.use("seaborn")
 
         greedy_color, ip_color = 'mediumaquamarine', 'violet'
         data = [[self.dataframe.greedy_obj, self.dataframe.ip_obj],
