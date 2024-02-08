@@ -38,6 +38,12 @@ parser.add_argument('--run_name', required=False, default='',
                     help="A name that can be used to distinguish different runs on the same graph.")
 parser.add_argument('--random_intents', required=False, action='store_true', default=True,
                     help="Running the methods on a graph where intents are generated randomly.")
+parser.add_argument('--num_intents', required=True, help="Number of intents for example.")
+
+
+# --- global variables ---
+TIME_HORIZON = 0
+TIME_DELTA = 0
 
 
 class InvalidSolutionError(Exception):
@@ -313,7 +319,7 @@ def create_intent(all_intents: list):
     source, destination = all_intents[random_index]
     source, destination = source['name'], destination['name']
     U = np.random.randint(low=0, high=6)
-    start = np.random.randint(low=0, high=20)
+    start = np.random.randint(low=0, high=(TIME_HORIZON/TIME_DELTA)//2)
 
     return {"source": source, "destination": destination, "start": start, "uncertainty": U}
 
@@ -671,9 +677,11 @@ if __name__ == "__main__":
     graph_name = args.graph_name
     run_name = args.run_name
     random_intents = args.random_intents
+    num_intents = args.num_intents
 
     np.random.seed(seed=seed)
     graph_path = f"./graphs/{graph_name}.json"
+    _, TIME_HORIZON, TIME_DELTA, _, _, _, _ = read_example(graph_path, None)
 
     if random_intents:
         random_runs_start_time = time.perf_counter()
@@ -690,20 +698,26 @@ if __name__ == "__main__":
 
         global_models_list = []
 
-        for _ in tqdm.tqdm(range(1, 1_000_001)):
+        intents_lst = [create_intent(all_possible_intents) for _ in range(num_intents)]
 
-            intents_lst = [create_intent(all_possible_intents) for _ in range(n_intents)]
+        print(f"\nExample: {example_number}\n{'=' * 100}", flush=True)
 
-            print(f"\nExample: {example_number}\n{'=' * 100}", flush=True)
+        ip_objective, greedy_objective = main(graph_path, False, intents_lst, results_collector)
 
-            ip_objective, greedy_objective = main(graph_path, False, intents_lst, results_collector)
-
-            current_time = time.perf_counter()
-            example_number += 1
-            n_intents = intents_incrementor * example_number
-
-            if current_time-random_runs_start_time >= constants.MAXIMUM_RUNTIME:
-                break
+        # for _ in tqdm.tqdm(range(1, 1_000_001)):
+        #
+        #     intents_lst = [create_intent(all_possible_intents) for _ in range(n_intents)]
+        #
+        #     print(f"\nExample: {example_number}\n{'=' * 100}", flush=True)
+        #
+        #     ip_objective, greedy_objective = main(graph_path, False, intents_lst, results_collector)
+        #
+        #     current_time = time.perf_counter()
+        #     example_number += 1
+        #     n_intents = intents_incrementor * example_number
+        #
+        #     if current_time-random_runs_start_time >= constants.MAXIMUM_RUNTIME:
+        #         break
 
         # --- storing results ---
         results_collector.save()
