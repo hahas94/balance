@@ -5,9 +5,8 @@ This file is used to read a problem, build a queue of operational intents,
 use both the greedy approach and integer programming approach to solve the
 routing problem and save the results.
 
-To run this file, define the path to an example json file first, then run. Example:
-    `example_path = "./examples/example1.json"`
 """
+import argparse
 import datetime
 import itertools
 import json
@@ -30,6 +29,15 @@ import graph
 import intent
 import optimization
 import utils
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--seed', required=False, default=2718, help="Setting a seed for reproducibility.")
+parser.add_argument('--graph_name', required=True,
+                    help=f"Name of graph. Assumes a graph with name `graph_name.json` exists in the graphs folder.")
+parser.add_argument('--run_name', required=False, default='',
+                    help="A name that can be used to distinguish different runs on the same graph.")
+parser.add_argument('--random_intents', required=False, action='store_true', default=True,
+                    help="Running the methods on a graph where intents are generated randomly.")
 
 
 class InvalidSolutionError(Exception):
@@ -651,22 +659,20 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAn
 
     global_models_list.append(ip_model)
 
-    print(f"\nRuntimes\n--------\nGreedy: {str(datetime.timedelta(seconds=greedy_runtime))}\n"
-          f"IP: {str(datetime.timedelta(seconds=ip_runtime))}\n")
-    print(f"Memory usage (GB)\n-----------------\nGreedy: {round(greedy_memory / 1e9, 2)}\n"
-          f"IP: {round(ip_memory / 1e9, 2)}\n")
-    print(f"Objectives\n----------\nGreedy: {greedy_obj}\nIP: {ip_obj}")
+    print(f"Objectives: Greedy={greedy_obj} IP={ip_obj}\n", flush=True)
 
     return greedy_obj, ip_obj
 
 
 if __name__ == "__main__":
-    seed = 2718
-    np.random.seed(seed=seed)
+    args = parser.parse_args()
 
-    # --- whether to run an example with randomly generated intents ---
-    random_intents = True
-    graph_name = 'stockholm_medium'  # assuming a graph with this name exists.
+    seed = args.seed
+    graph_name = args.graph_name
+    run_name = args.run_name
+    random_intents = args.random_intents
+
+    np.random.seed(seed=seed)
     graph_path = f"./graphs/{graph_name}.json"
 
     if random_intents:
@@ -679,7 +685,8 @@ if __name__ == "__main__":
 
         all_possible_intents = get_all_intents(path=graph_path)
         random_intents_lst = []
-        results_collector = ResultsAnalysis(graph_name)
+        results_dir_name = graph_name + "_" + run_name if len(run_name) > 0 else graph_name
+        results_collector = ResultsAnalysis(results_dir_name)
 
         global_models_list = []
 
@@ -687,7 +694,7 @@ if __name__ == "__main__":
 
             intents_lst = [create_intent(all_possible_intents) for _ in range(n_intents)]
 
-            print(f"\nExample: {example_number}\n{'=' * 100}")
+            print(f"\nExample: {example_number}\n{'=' * 100}", flush=True)
 
             ip_objective, greedy_objective = main(graph_path, False, intents_lst, results_collector)
 
