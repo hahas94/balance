@@ -5,6 +5,8 @@ This file contains functions that can be used to perform sanity checks on soluti
 found by the two methods. This is necessary because a method may produce a solution
 where it is difficult to manually ensure its correctness, and it may be wrong.
 """
+import collections
+from typing import List
 
 # function to check that times are strictly increasing
 #  to check that time + edge.weight = next_time
@@ -16,24 +18,25 @@ where it is difficult to manually ensure its correctness, and it may be wrong.
 
 import numpy as np
 
+import utils
+
 
 class ValidSolution:
     """An object that represents whether a method has a valid solution."""
-    __slots_ = ['method', 'time_correct', 'capacity_correct']
+    __slots_ = ['method', 'time_correct', 'capacity_correct', 'cycles_exists']
 
-    def __init__(self, method, time_correct, capacity_correct):
+    def __init__(self, method, time_correct, capacity_correct, cycles):
         self.method = method
         self.time_correct = time_correct
         self.capacity_correct = capacity_correct
+        self.cycles_exists = cycles
 
     def __repr__(self):
         return (f'ValidSolution(method={self.method}, time_correct={self.time_correct}, '
-                f'capacity_correct={self.capacity_correct})')
+                f'capacity_correct={self.capacity_correct}, cycles={self.cycles_exists})')
 
     def __str__(self):
-        tc = 'correct' if self.time_correct else 'not correct'
-        cc = 'correct' if self.capacity_correct else 'not correct'
-        return f"Method {self.method}: time={tc}, capacity={cc} "
+        return f"{self.time_correct and self.capacity_correct and not self.cycles_exists}"
 
 
 def time_correctness(path: list, edges: dict, time_delta: int) -> bool:
@@ -148,6 +151,40 @@ def capacity_correctness(intents: dict, nodes: dict, time_delta: int, time_horiz
     return greedy_capacity_correct, ip_capacity_correct
 
 
+def cycles_exists(path: List[utils.Link]):
+    """
+    Checks whether cycles occur in a path. Ground delay at source node is not considered as a cycle.
+    For each other vertiport, if it occurs twice in the path it means that a cycle exists.
+
+    Parameters
+    ----------
+    path: List[utils.Link]
+        Path of an intent.
+
+    Returns
+    -------
+    cycle_exist: bool
+
+    """
+    vertiports = [link.name for link in path]
+    vertiports_occurrence_count = collections.Counter(vertiports)
+    source_vertiport = path[0].name
+
+    # check for cycles among non-source vertiports
+    for vertiport, occurrence in vertiports_occurrence_count.items():
+        if vertiport != source_vertiport and occurrence > 1:
+            return True
+
+    # check for a cycle for the source vertiport, which could occurr
+    # if the drone goes back to source from some other vertiport.
+    for i in range(1, len(path)):
+        prev, curr = path[i-1].name, path[i].name
+        if prev != source_vertiport and curr == source_vertiport:
+            return True
+
+    return False
+
+
 def sanity_check(intents: dict, nodes: dict, edges: dict, time_delta: int, time_horizon: int) -> bool:
     """
     Performs sanity check on a drone path found by some method. The checks
@@ -177,17 +214,28 @@ def sanity_check(intents: dict, nodes: dict, edges: dict, time_delta: int, time_
     """
     greedy_time_correct = True
     ip_time_correct = True
+
+    greedy_cycles_not_exist = True
+    ip_cycles_not_exist = True
+
     for intent in intents.values():
         greedy_correct = time_correctness(intent.path_greedy, edges, time_delta)
         ip_correct = time_correctness(intent.path_ip, edges, time_delta)
         greedy_time_correct = greedy_time_correct and greedy_correct
         ip_time_correct = ip_time_correct and ip_correct
 
+        greedy_cycle = cycles_exists(intent.path_greedy)
+        ip_cycle = cycles_exists(intent.path_ip)
+
+        greedy_cycles_not_exist = greedy_cycles_not_exist and not greedy_cycle
+        ip_cycles_not_exist = ip_cycles_not_exist and not ip_cycle
+
     greedy_capacity_correct, ip_capacity_correct = capacity_correctness(intents, nodes, time_delta, time_horizon)
 
     greedy_vs = ValidSolution(method='Greedy', time_correct=greedy_time_correct,
-                              capacity_correct=greedy_capacity_correct)
-    ip_vs = ValidSolution(method='IP', time_correct=ip_time_correct, capacity_correct=ip_capacity_correct)
+                              capacity_correct=greedy_capacity_correct, cycles=not greedy_cycles_not_exist)
+    ip_vs = ValidSolution(method='IP', time_correct=ip_time_correct,
+                          capacity_correct=ip_capacity_correct, cycles=not ip_cycles_not_exist)
 
     return greedy_vs, ip_vs
 
