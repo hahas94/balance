@@ -224,11 +224,12 @@ def sanity_check(intents: dict, nodes: dict, edges: dict, time_delta: int, time_
         greedy_time_correct = greedy_time_correct and greedy_correct
         ip_time_correct = ip_time_correct and ip_correct
 
-        greedy_cycle = cycles_exists(intent.path_greedy)
-        ip_cycle = cycles_exists(intent.path_ip)
-
-        greedy_cycles_not_exist = greedy_cycles_not_exist and not greedy_cycle
-        ip_cycles_not_exist = ip_cycles_not_exist and not ip_cycle
+        if len(intent.path_greedy) > 0:
+            greedy_cycle = cycles_exists(intent.path_greedy)
+            greedy_cycles_not_exist = greedy_cycles_not_exist and not greedy_cycle
+        if len(intent.path_ip) > 0:
+            ip_cycle = cycles_exists(intent.path_ip)
+            ip_cycles_not_exist = ip_cycles_not_exist and not ip_cycle
 
     greedy_capacity_correct, ip_capacity_correct = capacity_correctness(intents, nodes, time_delta, time_horizon)
 
