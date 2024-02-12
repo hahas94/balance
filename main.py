@@ -36,8 +36,10 @@ parser.add_argument('--graph_name', required=True,
                     help=f"Name of graph. Assumes a graph with name `graph_name.json` exists in the graphs folder.")
 parser.add_argument('--run_name', required=False, default='',
                     help="A name that can be used to distinguish different runs on the same graph.")
-parser.add_argument('--random_intents', required=False, action='store_true', default=True,
+parser.add_argument('--random_intents', required=False, action='store_true', default=False,
                     help="Running the methods on a graph where intents are generated randomly.")
+parser.add_argument('--debug', required=False, action='store_true', default=False,
+                    help="Whether to run main function on a small graph for debugging purposes.")
 parser.add_argument('--num_intents', required=True, help="Number of intents for example.")
 
 
@@ -642,9 +644,9 @@ def main(path: str, verbose: bool, intents: List = None, analysis_obj: ResultsAn
 
         time_horizon_extender += 1
 
-    greedy_valid_solution, ip_valid_solution = (
-        checks.sanity_check(global_intents_dict, global_nodes_dict, global_edges_dict,
-                            global_time_delta, global_time_horizon))
+    greedy_valid_solution, ip_valid_solution = checks.sanity_check(global_intents_dict, global_nodes_dict,
+                                                                   global_edges_dict, global_time_delta,
+                                                                   global_time_horizon)
 
     if verbose:
         print_solutions(global_intents_dict)
@@ -680,7 +682,10 @@ if __name__ == "__main__":
     num_intents = int(args.num_intents)
 
     np.random.seed(seed=seed)
-    graph_path = f"./graphs/{graph_name}.json"
+    if args.debug:
+        graph_path = graph_name
+    else:
+        graph_path = f"./graphs/{graph_name}.json"
     _, TIME_HORIZON, TIME_DELTA, _, _, _, _ = read_example(graph_path, None)
 
     if random_intents:
@@ -727,6 +732,6 @@ if __name__ == "__main__":
         #     modl.write(f'./results/{graph_name}/models/{idx*intents_incrementor}_intents_model.mps')
 
     else:
-        greedy_objective, ip_objective = main(graph_path, True)
+        greedy_objective, ip_objective = main(graph_name, True)
 
 # =============================================== END OF FILE ===============================================
