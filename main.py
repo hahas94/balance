@@ -677,7 +677,7 @@ if __name__ == "__main__":
     graph_name = args.graph_name
     run_name = args.run_name
     random_intents = args.random_intents
-    num_intents = args.num_intents
+    num_intents = int(args.num_intents)
 
     np.random.seed(seed=seed)
     graph_path = f"./graphs/{graph_name}.json"
@@ -721,7 +721,7 @@ if __name__ == "__main__":
 
         # --- storing results ---
         results_collector.save()
-        results_collector.plot()
+        # results_collector.plot()
         # Unable to save models due to huge model sizes.
         # for idx, modl in enumerate(global_models_list, start=1):
         #     modl.write(f'./results/{graph_name}/models/{idx*intents_incrementor}_intents_model.mps')
