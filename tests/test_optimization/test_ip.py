@@ -32,6 +32,7 @@ def run_test(self):
             checks.sanity_check(self.intents, self.nodes, self.edges, self.time_delta, self.time_horizon))
         self.assertTrue(ip_valid_solution.time_correct)
         self.assertTrue(ip_valid_solution.capacity_correct)
+        self.assertTrue(not ip_valid_solution.cycles_exists)
 
 
 class Example1(unittest.TestCase):

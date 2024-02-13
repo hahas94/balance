@@ -55,6 +55,7 @@ def run_test(self):
         checks.sanity_check(self.intents, self.nodes, self.edges, self.time_delta, self.time_horizon))
     self.assertTrue(greedy_valid_solution.time_correct)
     self.assertTrue(greedy_valid_solution.capacity_correct)
+    self.assertTrue(not greedy_valid_solution.cycles_exists)
 
 
 class Example1(unittest.TestCase):
