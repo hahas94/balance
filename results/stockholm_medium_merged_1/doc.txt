@@ -1,0 +1,8 @@
+Explanation of the results in this folder:
+------------------------------------------
+
+1. This folder contains results for the graph `balance/graphs/stockholm_medium.json`.
+2. It was run on increasing number of intents starting from 10 and going up to 100 with steps of 10.
+3. The times period from which drone departure is sampled are between layers 0 and halfway through the time horizon.
+4. The runs where done in parallel for each number of drones, i.e. 10, 20, 30, ... etc. The results of are then merged,
+    hence the folder extension merged.

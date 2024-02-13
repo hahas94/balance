@@ -1,0 +1,6 @@
+Explanation of the results in this folder:
+------------------------------------------
+
+1. This folder contains results for the graph `balance/graphs/stockholm_medium.json`.
+2. It was run on increasing number of intents starting from 10 and going up to 110 with steps of 10.
+3. The times period from which drone departure is sampled are between layers 0 and 6 inclusive.
