@@ -705,7 +705,7 @@ if __name__ == "__main__":
 
         intents_lst = [create_intent(all_possible_intents) for _ in range(num_intents)]
 
-        print(f"\nExample: {example_number}\n{'=' * 100}", flush=True)
+        print(f"\nExample with {num_intents} intents:\n{'=' * 100}", flush=True)
 
         ip_objective, greedy_objective = main(graph_path, False, intents_lst, results_collector)
 
