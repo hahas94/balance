@@ -194,6 +194,6 @@ docs.txt
 optimization/mip_examples.py
 examples/
 results/medium_graph
-merge_results.py
+# merge_results.py
 ./results/stockholm_medium_*
 ./results/stockholm_large_*
