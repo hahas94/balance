@@ -12,7 +12,7 @@ Launching runs:
     >>> bash Balance_Stockholm_Medium.sh 10
 
 This will first create a folder in the results folder named `stockholm_medium_10`,
-and then save logs, data and plots to it.
+and then save logs and data to it.
 
 - Run multiple examples with intents starting from 10 and going to 100 intents with steps of 10:
     >>> for i in $(seq 10 10 100); do
