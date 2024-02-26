@@ -42,3 +42,14 @@ Assuming there exists results for 3 runs with the folder names `stockholm_medium
         --steps: the step taken for increasing the results folder name extensions.
 
     This command will result in a new folder named `stockholm_medium_merged` containg logs, data and plots.
+
+Plotting results:
+----------------
+Results in any folder can be replotted using `plot_results.py`.
+The arguments are as follows:
+        --curr_dir_name: the name of the folder containing results
+
+The script can be used as follows:
+
+python3 plot_results.py --curr_dir_name=stockholm_medium_merged_1
+python3 plot_results.py --curr_dir_name=stockholm_large_merged_1
