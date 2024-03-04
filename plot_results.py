@@ -6,8 +6,10 @@ import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--curr_dir_name', required=True, type=str,
-                    help="Base name of directory where results are saved. "
+                    help="Base name of directory where subresults are saved. "
+                         "A subresult folder may have the name `stockholm_medium_1`, "
                          "in this case `curr_dir_name` is `stockholm_medium.`")
+
 
 def plot_results(dataframe, name):
     """Creating plots of the data in the merged dataframes and saving them to disk."""
@@ -42,8 +44,8 @@ def plot_results(dataframe, name):
         ax.legend()
 
         fig.savefig(f'./results/{name}/{plot_names[indx]}.png')
-        print("Plotting done.")
 
+    print("Plotting done.")
     return
 
 
