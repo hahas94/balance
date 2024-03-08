@@ -1,9 +1,9 @@
 #!/bin/sh
 #SBATCH -t 24:00:00
 #SBATCH -J Balance_Stockholm_Large
-#SBATCH -N 1
-#SBATCH --mem=128000
+#SBATCH --mem=300000
 #SBATCH --exclusive
+#SBATCH -N 1
 #SBATCH --mail-user=hardy.hasan@liu.se
 #SBATCH --mail-type=ALL
 
