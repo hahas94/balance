@@ -4,7 +4,6 @@ This file contains functionality for plotting different aspects of the results.
 import argparse
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
 parser = argparse.ArgumentParser()
@@ -33,23 +32,25 @@ def plot_results(dataframe, name):
                                     [round(max(delays) / 60, 1) for delays in ip_delays]]
 
     average_travel_time_extension = [
-        [(sum(delays) / sum(ideal_times[idx])) / 60 for idx, delays in enumerate(greedy_delays)],
-        [(sum(delays) / sum(ideal_times[idx])) / 60 for idx, delays in enumerate(ip_delays)]
+        [(sum(delays) / len(delays)) / 60 for idx, delays in enumerate(greedy_delays)],
+        [(sum(delays) / len(delays)) / 60 for idx, delays in enumerate(ip_delays)]
     ]
 
-    max_travel_time_extension_percentage = 80
+    max_travel_time_extension_percentage = 20
     greedy_travel_time_extension_percentages = [[round(100 * td / ideal_times[idx][indx], 1)
                                                  for indx, td in enumerate(delays)]
                                                 for idx, delays in enumerate(greedy_delays)]
     greedy_percentage_of_drones_with_exceeded_time_extension = [
-        sum([percentage > max_travel_time_extension_percentage for percentage in percentages])
+        round(100 * sum([percentage > max_travel_time_extension_percentage
+                         for percentage in percentages]) / len(percentages), 1)
         for percentages in greedy_travel_time_extension_percentages]
 
     ip_travel_time_extension_percentages = [[round(100 * td / ideal_times[idx][indx], 1)
                                              for indx, td in enumerate(delays)]
                                             for idx, delays in enumerate(ip_delays)]
     ip_percentage_of_drones_with_exceeded_time_extension = [
-        sum([percentage > max_travel_time_extension_percentage for percentage in percentages])
+        round(100 * sum([percentage > max_travel_time_extension_percentage
+                         for percentage in percentages]) / len(percentages), 1)
         for percentages in ip_travel_time_extension_percentages]
 
     percentage_of_drones_with_exceeded_time_extension = [greedy_percentage_of_drones_with_exceeded_time_extension,
