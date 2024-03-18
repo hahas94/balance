@@ -232,10 +232,6 @@ def read_example(path: str, intents=None) \
                 f"{op_intent}: Either syntax error in names, start time being non integer, it starts before "
                 f"operations start time or time uncertainty is negative/non-integer.")
 
-            if intents:
-                op_intent["uncertainty"] = min(op_intent["uncertainty"] * time_delta, time_horizon // 10)
-                op_intent["start"] = min(op_intent["start"] * time_delta, time_horizon // 2)
-
         return start, time_horizon, time_delta, speed, nodes, edges, intents_list
 
 
@@ -302,7 +298,7 @@ def get_all_intents(path):
         return possible_intents
 
 
-def create_intent(all_intents: list):
+def create_intent(all_intents: list, time_horizon: int, time_delta: int):
     """
     Selects an intent randomly from the list of all intents.
     Then generates random start time and time uncertainty.
@@ -320,8 +316,9 @@ def create_intent(all_intents: list):
     random_index = np.random.randint(low=0, high=len(all_intents))
     source, destination = all_intents[random_index]
     source, destination = source['name'], destination['name']
-    U = np.random.randint(low=0, high=6)
-    start = np.random.randint(low=0, high=(TIME_HORIZON/TIME_DELTA)//2)
+    U = np.random.randint(low=0, high=6) * time_delta
+    U = min(U, time_horizon // 10)
+    start = min(np.random.randint(low=0, high=(time_horizon/time_delta)//2) * time_delta, time_horizon // 2)
 
     return {"source": source, "destination": destination, "start": start, "uncertainty": U}
 
@@ -703,7 +700,8 @@ if __name__ == "__main__":
 
         global_models_list = []
 
-        intents_lst = [create_intent(all_possible_intents) for _ in range(num_intents)]
+        intents_lst = [create_intent(all_possible_intents, time_horizon=TIME_HORIZON, time_delta=TIME_DELTA)
+                       for _ in range(num_intents)]
 
         print(f"\nExample with {num_intents} intents:\n{'=' * 100}", flush=True)
 
