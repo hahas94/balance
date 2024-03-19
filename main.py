@@ -307,6 +307,11 @@ def create_intent(all_intents: list, time_horizon: int, time_delta: int):
     ----------
     all_intents: list
         A list of all possible intents
+    time_horizon: int
+        Planning time horizon.
+    time_delta: int
+        Time delta.
+
 
     Returns
     -------
