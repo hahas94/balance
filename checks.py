@@ -142,6 +142,7 @@ def capacity_correctness(intents: dict, nodes: dict, time_delta: int, time_horiz
                 if not left and right:
                     left = dep_link.layer + 1
 
+                print(f"dep_link={dep_link}, arr_link={arr_link}, left={left}, right={right}", flush=True)
                 reservations[vertiport_id][range(left, right+1)] += 1
 
     vertiport_capacities = np.expand_dims(np.array([node.capacity for node in nodes.values()]), 1)

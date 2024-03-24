@@ -76,6 +76,9 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     edge_weights = [edge.weight for edge in edges.values()] + [time_delta]
     # edge weights in terms of time delta
     edge_weights_td = [math.ceil(edge.weight / time_delta) * time_delta for edge in edges.values()] + [time_delta]
+    
+    largest_edge_weight = max(edge_weights_td)
+    arrival_time_steps_ids = range(len(time_steps) + 2*largest_edge_weight)
 
     # function that takes a drone d's id, and returns the edges_list with the edge (d.source, d.source) added to it
     extend_edges_list: Callable[[int], list[tuple[str, str]]] = \
@@ -91,9 +94,13 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                           for t in time_steps_ids] for d in drones_ids] for e in edges_ids]
 
     # whether drone `d` finishes taking edge `e` at time step `t`
+    # drones_arrival = [[[model.add_var(name=f"Arrival_{extend_edges_list(d)[e]}__D{d}__T_{t * time_delta}",
+    #                                   var_type=mip.BINARY)
+    #                     for t in time_steps_ids] for d in drones_ids] for e in edges_ids]
+
     drones_arrival = [[[model.add_var(name=f"Arrival_{extend_edges_list(d)[e]}__D{d}__T_{t * time_delta}",
-                                      var_type=mip.BINARY)
-                        for t in time_steps_ids] for d in drones_ids] for e in edges_ids]
+                                      var_type=mip.BINARY) 
+                                      for t in arrival_time_steps_ids] for d in drones_ids] for e in edges_ids]
 
     # whether vertiport `v` is reserved for drone `d` starting at time step `t`
     vertiport_reserved = [[[model.add_var(name=f"Vertiport_{vertiports_list[v]}__D{d}__T_{t * time_delta}",
@@ -180,27 +187,23 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
 
     # 6. The value of the decision variable for arrival of an edge must equal
     #    the value of the decision variable of departure time for that edge.
+    # for e in edges_ids:
+    #     edge_weight = edge_weights_td[e]
+    #     for d in drones_ids:
+    #         for t in time_steps_ids:
+    #             w = t - (edge_weight // time_delta)
+    #             if w >= 0:
+    #                 model.add_constr(drones_arrival[e][d][t] == drones_departure[e][d][w],
+    #                                  "Drone arrival and departure times differs by edge weight.")
+                    
     for e in edges_ids:
         edge_weight = edge_weights_td[e]
         for d in drones_ids:
             for t in time_steps_ids:
-                w = t - (edge_weight // time_delta)
-                if w >= 0:
-                    model.add_constr(drones_arrival[e][d][t] == drones_departure[e][d][w],
+                arr_t = t + (edge_weight // time_delta)
+                model.add_constr(drones_arrival[e][d][arr_t] == drones_departure[e][d][t],
                                      "Drone arrival and departure times differs by edge weight.")
 
-    # Extra: A drone's total travel time cannot pass beyond time horizon.
-    T = time_steps[-1]
-    for d in drones_ids:
-        model.add_constr(mip.xsum(drones_departure[e][d][t] * edge_weights_td[e]
-                                  for t in time_steps_ids for e in edges_ids)
-                         <= T, "")
-
-    # Extra: A drone can traverse one edge at a time.
-    for d in drones_ids:
-        for t in time_steps_ids:
-            model.add_constr(mip.xsum(drones_departure[e][d][t] for e in edges_ids) <= 1,
-                             "One edge at a time is traversed.")
 
     # ---- Objective ----
     # minimizing the total sum of times of all drone schedules.
@@ -218,6 +221,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
 
         # build the path of each drone
         for d in drones_ids:
+            print(f"Drone={d}\n{'='*100}", flush=True)
             path = []
             intent = intents[drones_list[d]]
             travel_time = 0
@@ -250,6 +254,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
 
                         travel_time += w
                         path.append(link)
+                        print(f"link.left={left_most_reserved_layer}, link.right={right_most_reserved_layer}", flush=True)
 
             # adding arrival link for completeness
             if arr_var:
@@ -269,6 +274,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                                           left_reserved_layer=left_most_reserved_layer,
                                           right_reserved_layer=right_most_reserved_layer)
                 path.append(arrival_link)
+                print(f"arrival_link.left={left_most_reserved_layer}, arrival_link.right={right_most_reserved_layer}", flush=True)
 
                 intent.actual_ip_time = travel_time
                 intent.build_ip_path(path)
@@ -276,3 +282,5 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
     return ip_obj if model.num_solutions else None, model
 
 # =============================================== END OF FILE ===============================================
+
+
