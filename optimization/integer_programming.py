@@ -217,6 +217,7 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
 
     # ---- Output ----
     if model.num_solutions:
+        print("DID WE GET HERE??", flush=True)
         ip_obj = model.objective_value
 
         # build the path of each drone
@@ -254,7 +255,6 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
 
                         travel_time += w
                         path.append(link)
-                        print(f"link.left={left_most_reserved_layer}, link.right={right_most_reserved_layer}", flush=True)
 
             # adding arrival link for completeness
             if arr_var:
@@ -274,7 +274,6 @@ def ip_optimization(nodes: dict, edges: dict, intents: dict, time_steps: range, 
                                           left_reserved_layer=left_most_reserved_layer,
                                           right_reserved_layer=right_most_reserved_layer)
                 path.append(arrival_link)
-                print(f"arrival_link.left={left_most_reserved_layer}, arrival_link.right={right_most_reserved_layer}", flush=True)
 
                 intent.actual_ip_time = travel_time
                 intent.build_ip_path(path)
